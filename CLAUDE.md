@@ -119,6 +119,5 @@ git checkout master && git pull
 ## 사용자 정보
 
 - 맥북 사용자 (macOS, zsh)
-- 직장에서 Java Spring 사용 중, 대기업 이직 목표로 포트폴리오 강화 중
 - Claude Code CLI 또는 VS Code 익스텐션으로 작업
 - Python 환경: `Optional[float]` 사용 (`float | None` 미지원)

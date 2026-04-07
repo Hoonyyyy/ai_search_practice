@@ -3,7 +3,7 @@
 #   Maven + JDK 이미지로 소스코드를 컴파일해서 .jar 파일을 만든다.
 #   이 단계는 최종 이미지에 포함되지 않아 용량을 줄인다.
 # ────────────────────────────────────────────────────────────
-FROM maven:3.9-eclipse-temurin-20 AS builder
+FROM --platform=linux/amd64 maven:3.9-eclipse-temurin-20 AS builder
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ RUN mvn package -DskipTests -q
 # Stage 2 : 실행 단계
 #   JDK 전체가 아닌 JRE(실행만 가능한 경량 버전)만 포함한다.
 # ────────────────────────────────────────────────────────────
-FROM eclipse-temurin:20-jre-alpine
+FROM --platform=linux/amd64 eclipse-temurin:20-jre-alpine
 
 WORKDIR /app
 
