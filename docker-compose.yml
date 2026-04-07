@@ -26,7 +26,7 @@ services:
       # ChromaDB 벡터 데이터를 컨테이너 삭제 후에도 유지
       - chroma_data:/app/data/chroma_db
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -47,7 +47,7 @@ services:
       backend-ai:
         condition: service_healthy  # AI 서비스가 준비된 후에 Spring Boot 시작
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/documents"]
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8080/api/documents || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
