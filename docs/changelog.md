@@ -2,6 +2,35 @@
 
 ---
 
+## v3.2 — GitHub Flow 브랜치 전략 도입
+
+### 배경
+- `master` 단일 브랜치만 사용하는 방식은 현업 협업 환경과 다름
+- 기능 단위로 브랜치를 분리해 이력을 명확히 관리
+
+### 브랜치 전략 (GitHub Flow)
+
+```
+master          → 항상 배포 가능한 최종 코드. 직접 commit 금지.
+feature/이름    → 기능 하나씩 개발. 완료되면 master에 merge.
+hotfix/이름     → 긴급 버그 수정. 완료되면 master에 merge.
+```
+
+**작업 흐름:**
+```
+1. feature/기능명 브랜치 생성
+2. 개발 및 커밋
+3. master에 merge
+4. GitHub push
+```
+
+### 변경 사항
+- `docs/architecture.md` — 브랜치 전략 섹션 추가
+- GitHub remote 연결: `git@github.com:Hoonyyyy/ai_search_practice.git`
+- `.gitignore` 현재 구조에 맞게 재작성 (venv, target, node_modules 등)
+
+---
+
 ## v3.1 — Docker 환경 구성 및 파일 정리
 
 ### 배경

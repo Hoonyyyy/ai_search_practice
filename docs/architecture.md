@@ -179,3 +179,45 @@ npm start
 ```
 
 > Ollama도 실행 중이어야 합니다: `ollama serve`
+
+---
+
+## 브랜치 전략 (GitHub Flow)
+
+```
+master          → 항상 배포 가능한 최종 코드. 직접 commit 금지.
+feature/이름    → 기능 하나씩 개발. 완료되면 master에 merge.
+hotfix/이름     → 긴급 버그 수정. 완료되면 master에 merge.
+```
+
+### 작업 흐름
+
+```bash
+# 1. 새 기능 시작
+git checkout -b feature/기능명
+
+# 2. 개발 후 커밋
+git add .
+git commit -m "feat: 기능 설명"
+
+# 3. master에 merge
+git checkout master
+git merge feature/기능명
+
+# 4. GitHub push
+git push origin master
+
+# 5. 브랜치 정리
+git branch -d feature/기능명
+```
+
+### 커밋 메시지 규칙
+
+| 접두사 | 용도 | 예시 |
+|---|---|---|
+| `feat:` | 새 기능 | `feat: 문서 업로드 진행 바 추가` |
+| `fix:` | 버그 수정 | `fix: SSE 스트리밍 버튼 잠김 오류` |
+| `refactor:` | 리팩토링 | `refactor: Spring Boot 구조 도입` |
+| `docs:` | 문서 수정 | `docs: changelog 업데이트` |
+| `chore:` | 설정/환경 | `chore: Docker 환경 구성` |
+
