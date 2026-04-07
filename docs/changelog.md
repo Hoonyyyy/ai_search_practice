@@ -2,6 +2,32 @@
 
 ---
 
+## v3.3 — GitHub CLI 및 PR 기반 협업 워크플로우 설정
+
+### 배경
+- `git push` + GitHub 웹에서 PR 여는 방식은 번거로움
+- CLI에서 모든 작업(브랜치 생성 → 커밋 → PR 생성)을 완결하기 위해 gh CLI 도입
+
+### 변경 사항
+- `gh` CLI 설치 및 GitHub 계정 인증 (`gh auth login`)
+- SSH 프로토콜로 git 연동 (`git@github.com:Hoonyyyy/ai_search_practice.git`)
+- 이제부터 모든 기능 개발은 feature 브랜치 → PR → master merge 방식으로 진행
+
+### 개발 흐름 (실제 사용 예시)
+```bash
+git checkout -b feature/기능명        # 브랜치 생성
+# 개발 작업
+git add -p                             # 변경 사항 확인하며 스테이징
+git commit -m "feat: 기능 설명"
+git push origin feature/기능명
+gh pr create --title "..." --body "..." # PR 생성
+gh pr merge --squash                    # PR 머지
+git checkout master && git pull
+git branch -d feature/기능명
+```
+
+---
+
 ## v3.2 — GitHub Flow 브랜치 전략 도입
 
 ### 배경
