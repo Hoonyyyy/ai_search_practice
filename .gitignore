@@ -1,0 +1,30 @@
+# ── Python ──────────────────────────────
+# 패키지 설치 폴더 (pip install로 각자 설치)
+backend-ai/venv/
+backend-ai/__pycache__/
+backend-ai/**/__pycache__/
+*.pyc
+
+# 환경변수 파일 (API 키 등 민감 정보)
+backend-ai/.env
+
+# AI 데이터 (용량이 크고 각자 생성됨)
+backend-ai/data/
+
+# ── Java / Spring Boot ───────────────────
+# Maven 빌드 결과물 (mvn package로 생성)
+backend-spring/target/
+
+# H2 DB 파일 (앱 실행 시 자동 생성)
+backend-spring/data/
+
+# ── React ───────────────────────────────
+# 패키지 설치 폴더 (npm install로 각자 설치)
+frontend/node_modules/
+
+# 빌드 결과물 (npm run build로 생성)
+frontend/build/
+
+# ── 공통 ────────────────────────────────
+.DS_Store
+*.env

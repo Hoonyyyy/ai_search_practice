@@ -1,0 +1,25 @@
+.card {
+  background: #1e1e2e;
+  border-radius: 12px;
+  padding: 20px 24px;
+  flex: 1;
+  min-width: 140px;
+  border: 1px solid #333;
+}
+
+.label {
+  color: #888;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.value {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.sub {
+  color: #555;
+  font-size: 12px;
+  margin-top: 2px;
+}

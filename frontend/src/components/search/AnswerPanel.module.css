@@ -1,0 +1,123 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #555;
+  font-size: 14px;
+}
+
+/* 성능 배지 */
+.badges {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  background: #1e1e2e;
+  border-radius: 8px;
+  padding: 8px 16px;
+}
+
+.badgeLabel {
+  color: #888;
+  font-size: 12px;
+}
+
+.badgeValue {
+  font-weight: 700;
+}
+
+/* 답변 박스 */
+.answerBox {
+  background: #1e1e2e;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 20px;
+  min-height: 120px;
+}
+
+.answerLabel {
+  color: #888;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.streamingDot {
+  color: #6366f1;
+}
+
+.answerText {
+  color: #e0e0e0;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  font-size: 14px;
+}
+
+.cursor {
+  animation: blink 1s infinite;
+  color: #6366f1;
+}
+
+/* 출처 */
+.sourceLabel {
+  color: #888;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.sourceList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sourceItem {
+  background: #161622;
+  border: 1px solid #2a2a3e;
+  border-radius: 8px;
+  padding: 10px 16px;
+}
+
+.sourceFilename {
+  color: #6366f1;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.sourcePreview {
+  color: #777;
+  font-size: 12px;
+}
+
+/* 피드백 */
+.feedback {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.feedbackLabel {
+  color: #888;
+  font-size: 13px;
+}
+
+.feedbackDone {
+  color: #10b981;
+  font-size: 13px;
+}
+
+.starBtn {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}

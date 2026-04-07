@@ -1,0 +1,35 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/ragsearch
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true        # http://localhost:8080/h2-console 로 DB 조회 가능
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: update     # 앱 시작 시 스키마 자동 생성/업데이트
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+ai:
+  service:
+    # 로컬 실행: http://localhost:8001
+    # Docker 실행: AI_SERVICE_URL 환경변수로 자동 덮어씌워짐 (docker-compose.yml 참고)
+    url: ${AI_SERVICE_URL:http://localhost:8001}
+
+document:
+  chunk-size: 500
+  chunk-overlap: 50
+  allowed-extensions: .pdf,.txt,.md
+
+logging:
+  level:
+    com.ragsearch: DEBUG

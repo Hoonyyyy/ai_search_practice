@@ -1,0 +1,104 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sectionTitle {
+  color: #ccc;
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* 문서 목록 */
+.docList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.docItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #1e1e2e;
+  border-radius: 8px;
+  padding: 10px 16px;
+  border: 1px solid #333;
+}
+
+.docName {
+  color: #e0e0e0;
+  font-size: 14px;
+}
+
+.docMeta {
+  color: #666;
+  font-size: 12px;
+  margin-left: 10px;
+}
+
+.deleteBtn {
+  background: transparent;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+
+.deleteBtn:hover {
+  background: #ef444420;
+}
+
+/* 검색 입력 */
+.searchRow {
+  display: flex;
+  gap: 8px;
+}
+
+.searchInput {
+  flex: 1;
+  background: #1e1e2e;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #e0e0e0;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.searchInput:focus {
+  border-color: #6366f1;
+}
+
+.searchBtn {
+  background: #6366f1;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.searchBtn:hover:not(:disabled) {
+  background: #4f52d0;
+}
+
+.searchBtn:disabled {
+  background: #444;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #ef4444;
+  font-size: 13px;
+}

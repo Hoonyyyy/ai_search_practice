@@ -1,0 +1,71 @@
+# ────────────────────────────────────────────────────────────
+# Docker Compose 설정
+#
+# "docker compose up" 한 줄로 아래 3개 서버가 한번에 뜬다.
+#   - backend-ai    : Python AI 서비스 (포트 8001)
+#   - backend-spring: Spring Boot API 서버 (포트 8080)
+#   - frontend      : React + Nginx (포트 3000)
+#
+# 주의: Ollama는 Docker 밖(호스트 머신)에서 별도로 실행해야 한다.
+#       실행 명령: ollama serve
+# ────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Python AI 서비스 ──────────────────────────────────────
+  # 임베딩 생성, 벡터 검색, LLM 스트리밍 담당
+  # Spring Boot가 내부적으로 호출 (외부에서 직접 접근 안 함)
+  backend-ai:
+    build: ./backend-ai
+    ports:
+      - "8001:8001"   # 디버깅용으로만 열어둠 (없애도 무방)
+    environment:
+      # host.docker.internal: 컨테이너 안에서 내 맥/PC의 Ollama에 접근하는 주소
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    volumes:
+      # ChromaDB 벡터 데이터를 컨테이너 삭제 후에도 유지
+      - chroma_data:/app/data/chroma_db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Spring Boot API 서버 ──────────────────────────────────
+  # React의 모든 요청을 받아 처리, JPA/H2로 데이터 관리
+  backend-spring:
+    build: ./backend-spring
+    ports:
+      - "8080:8080"   # 디버깅용으로만 열어둠 (없애도 무방)
+    environment:
+      # 컨테이너 안에서 Python AI 서비스 컨테이너의 주소
+      - AI_SERVICE_URL=http://backend-ai:8001
+    volumes:
+      # H2 DB 파일을 컨테이너 삭제 후에도 유지
+      - h2_data:/app/data
+    depends_on:
+      backend-ai:
+        condition: service_healthy  # AI 서비스가 준비된 후에 Spring Boot 시작
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/documents"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── React 프론트엔드 ──────────────────────────────────────
+  # React 빌드 파일을 Nginx로 서빙
+  # /api/** 요청은 Nginx가 Spring Boot로 자동으로 넘겨준다.
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"     # 브라우저에서 localhost:3000 으로 접속
+    depends_on:
+      backend-spring:
+        condition: service_healthy  # Spring Boot가 준비된 후에 Nginx 시작
+
+# ── 영구 저장소 (볼륨) ────────────────────────────────────
+# 컨테이너를 삭제해도 데이터가 사라지지 않는다.
+# "docker compose down -v" 를 하면 볼륨까지 삭제된다. (주의!)
+volumes:
+  chroma_data:   # ChromaDB 벡터 데이터
+  h2_data:       # H2 DB 파일 (문서 목록, 쿼리 로그)
