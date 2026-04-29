@@ -1,5 +1,5 @@
 fastapi
 uvicorn[standard]
-chromadb
+qdrant-client[fastembed]
 groq
 pydantic-settings

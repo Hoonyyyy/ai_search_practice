@@ -5,12 +5,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 빌드 시점에 ONNX 임베딩 모델 다운로드 (컨테이너 시작 지연 방지)
-RUN python -c "from chromadb.utils.embedding_functions import DefaultEmbeddingFunction; DefaultEmbeddingFunction()"
+# 빌드 시점에 fastembed 모델 다운로드 (컨테이너 시작 지연 방지)
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')"
 
 COPY . .
-
-RUN mkdir -p /app/data/chroma_db
 
 EXPOSE 8001
 

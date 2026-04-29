@@ -1,66 +1,99 @@
-"""ChromaDB 벡터 데이터 접근 레이어."""
-import chromadb
-from chromadb.config import Settings as ChromaSettings
-from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+"""Qdrant Cloud 벡터 데이터 접근 레이어."""
+from qdrant_client import QdrantClient
+from qdrant_client.models import (
+    Distance, VectorParams, PointStruct,
+    Filter, FieldCondition, MatchValue,
+)
+from fastembed import TextEmbedding
 from config import settings
 from typing import List, Dict, Any, Generator
+import uuid
 
-_client = None
-_collection = None
-_ef = DefaultEmbeddingFunction()
+COLLECTION = "documents"
+VECTOR_SIZE = 384  # BAAI/bge-small-en-v1.5
+
+_client: QdrantClient | None = None
+_embed_model: TextEmbedding | None = None
 
 
-def _get_collection():
-    global _client, _collection
+def _get_client() -> QdrantClient:
+    global _client
     if _client is None:
-        _client = chromadb.PersistentClient(
-            path=settings.chroma_path,
-            settings=ChromaSettings(anonymized_telemetry=False),
-        )
-    if _collection is None:
-        _collection = _client.get_or_create_collection(
-            name="documents",
-            embedding_function=_ef,
-            metadata={"hnsw:space": "cosine"},
-        )
-    return _collection
+        _client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key)
+        existing = {c.name for c in _client.get_collections().collections}
+        if COLLECTION not in existing:
+            _client.create_collection(
+                collection_name=COLLECTION,
+                vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+            )
+    return _client
+
+
+def _get_model() -> TextEmbedding:
+    global _embed_model
+    if _embed_model is None:
+        _embed_model = TextEmbedding("BAAI/bge-small-en-v1.5")
+    return _embed_model
+
+
+def _embed(texts: List[str]) -> List[List[float]]:
+    return [v.tolist() for v in _get_model().embed(texts)]
 
 
 def add_chunks_stream(doc_id: str, filename: str, chunks: List[str]) -> Generator:
-    """배치 단위로 ChromaDB에 저장하며 진행률을 (done, total)로 yield."""
-    collection = _get_collection()
-    ids = [f"{doc_id}_{i}" for i in range(len(chunks))]
-    metadatas = [{"doc_id": doc_id, "filename": filename, "chunk_index": i} for i in range(len(chunks))]
-
-    batch_size = 16
+    """배치 단위로 Qdrant에 저장하며 진행률을 (done, total)로 yield."""
+    client = _get_client()
     total = len(chunks)
+    batch_size = 16
+
     for i in range(0, total, batch_size):
         end = min(i + batch_size, total)
-        collection.add(
-            ids=ids[i:end],
-            documents=chunks[i:end],
-            metadatas=metadatas[i:end],
-        )
+        batch = chunks[i:end]
+        vectors = _embed(batch)
+        points = [
+            PointStruct(
+                id=str(uuid.uuid4()),
+                vector=vectors[j],
+                payload={
+                    "doc_id": doc_id,
+                    "filename": filename,
+                    "chunk_index": i + j,
+                    "content": batch[j],
+                },
+            )
+            for j in range(len(batch))
+        ]
+        client.upsert(collection_name=COLLECTION, points=points)
         yield end, total
 
 
 def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
-    collection = _get_collection()
-    if collection.count() == 0:
-        return []
-    results = collection.query(
-        query_texts=[query],
-        n_results=min(top_k, collection.count()),
-        include=["documents", "metadatas", "distances"],
+    client = _get_client()
+    query_vec = _embed([query])[0]
+    hits = client.search(
+        collection_name=COLLECTION,
+        query_vector=query_vec,
+        limit=top_k,
+        with_payload=True,
     )
     return [
-        {"content": doc, "metadata": results["metadatas"][0][i], "distance": results["distances"][0][i]}
-        for i, doc in enumerate(results["documents"][0])
+        {
+            "content": h.payload["content"],
+            "metadata": {
+                "doc_id": h.payload["doc_id"],
+                "filename": h.payload["filename"],
+                "chunk_index": h.payload["chunk_index"],
+            },
+            "distance": 1.0 - h.score,
+        }
+        for h in hits
     ]
 
 
 def delete_document(doc_id: str) -> None:
-    collection = _get_collection()
-    results = collection.get(where={"doc_id": doc_id})
-    if results["ids"]:
-        collection.delete(ids=results["ids"])
+    _get_client().delete(
+        collection_name=COLLECTION,
+        points_selector=Filter(
+            must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
+        ),
+    )

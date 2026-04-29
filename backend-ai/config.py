@@ -5,8 +5,8 @@ BASE_DIR = Path(__file__).parent
 
 
 class Settings(BaseSettings):
-    chroma_path: str = str(BASE_DIR / "data" / "chroma_db")
-    embed_model: str = "all-MiniLM-L6-v2"
+    qdrant_url: str = ""
+    qdrant_api_key: str = ""
     groq_api_key: str = ""
     groq_model: str = "llama-3.1-8b-instant"
     top_k: int = 4
