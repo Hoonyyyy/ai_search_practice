@@ -1,6 +1,5 @@
 fastapi
 uvicorn[standard]
-sentence-transformers
 chromadb
 groq
 pydantic-settings
