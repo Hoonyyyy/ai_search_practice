@@ -26,6 +26,12 @@ def _get_client() -> QdrantClient:
                 collection_name=COLLECTION,
                 vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
             )
+        # doc_id 필터링(삭제/검색)에 필요한 payload 인덱스 — 없으면 400 에러
+        _client.create_payload_index(
+            collection_name=COLLECTION,
+            field_name="doc_id",
+            field_schema="keyword",
+        )
     return _client
 
 
@@ -70,9 +76,10 @@ def add_chunks_stream(doc_id: str, filename: str, chunks: List[str]) -> Generato
 def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
     client = _get_client()
     query_vec = _embed([query])[0]
-    hits = client.search(
+    # qdrant-client 1.7+ 에서 client.search() 제거 → query_points() 사용
+    result = client.query_points(
         collection_name=COLLECTION,
-        query_vector=query_vec,
+        query=query_vec,
         limit=top_k,
         with_payload=True,
     )
@@ -86,7 +93,7 @@ def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
             },
             "distance": 1.0 - h.score,
         }
-        for h in hits
+        for h in result.points
     ]
 
 
