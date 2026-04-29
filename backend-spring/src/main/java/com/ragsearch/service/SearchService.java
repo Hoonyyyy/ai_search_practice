@@ -44,8 +44,21 @@ public class SearchService {
             long startMs = System.currentTimeMillis();
 
             try {
+                // heartbeat: cold start 대기 중 nginx 502 방지
+                java.util.concurrent.ScheduledExecutorService heartbeat =
+                        java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+                heartbeat.scheduleAtFixedRate(() -> {
+                    try { emitter.send(SseEmitter.event().comment("heartbeat")); }
+                    catch (Exception ignored) {}
+                }, 5, 5, java.util.concurrent.TimeUnit.SECONDS);
+
                 // 1. 벡터 유사도 검색
-                List<Map<String, Object>> chunks = aiServiceClient.searchVectors(question, topK);
+                List<Map<String, Object>> chunks;
+                try {
+                    chunks = aiServiceClient.searchVectors(question, topK);
+                } finally {
+                    heartbeat.shutdownNow();
+                }
 
                 if (chunks.isEmpty()) {
                     sendEvent(emitter, Map.of("type", "meta", "query_id", queryId, "sources", List.of()));
