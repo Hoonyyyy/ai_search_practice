@@ -2,6 +2,31 @@
 
 ---
 
+## v3.4 — Qdrant Cloud 전환 + Render cold start 502 대응
+
+### 배경
+- Render 무료 플랜 512MB RAM 초과 (chromadb + onnxruntime ~430MB) → OOM
+- Python AI cold start 시 Render nginx가 502 즉시 반환 → 검색/삭제 실패
+
+### 변경 사항
+
+**OOM 해결 (backend-ai)**
+- chromadb + onnxruntime → Qdrant Cloud (HTTP 클라이언트) + fastembed 전환
+- `requirements.txt`: `qdrant-client[fastembed]`, `groq` 로 교체
+- `config.py`: `qdrant_url`, `qdrant_api_key` 설정 추가
+- `repositories/vector_repository.py`: Qdrant Cloud 기반 전면 재작성
+- `services/embedder.py`: fastembed `BAAI/bge-small-en-v1.5` 모델 preload
+- `Dockerfile`: 빌드 시 fastembed 모델 다운로드 (cold start 지연 방지)
+- 메모리 사용량: ~430MB → ~230MB
+
+**Render cold start 502 대응 (backend-spring)**
+- `AiServiceClient`: `searchVectors`, `deleteVectors`, `embedAndStore` 에 retry 로직 추가
+  - 502 응답 시 5초 간격으로 최대 12회 재시도 (총 60초)
+- `SearchController`, `DocumentController`: `X-Accel-Buffering: no` 헤더 추가
+- `SearchService`, `DocumentService`: heartbeat SSE comment 5초 간격 전송 (nginx 502 방지)
+
+---
+
 ## v3.3 — GitHub CLI 및 PR 기반 협업 워크플로우 설정
 
 ### 배경
