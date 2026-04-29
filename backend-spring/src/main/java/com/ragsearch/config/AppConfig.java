@@ -2,6 +2,7 @@ package com.ragsearch.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.concurrent.ExecutorService;
@@ -10,13 +11,12 @@ import java.util.concurrent.Executors;
 @Configuration
 public class AppConfig {
 
-    /**
-     * Python AI 서비스 HTTP 호출용 RestTemplate.
-     * SSE 스트리밍 응답을 읽기 위해 타임아웃을 길게 설정.
-     */
     @Bean
     public RestTemplate restTemplate() {
-        return new RestTemplate();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10_000);
+        factory.setReadTimeout(300_000); // 임베딩/LLM 스트리밍 최대 5분
+        return new RestTemplate(factory);
     }
 
     /**

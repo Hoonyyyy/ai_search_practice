@@ -2,5 +2,5 @@ fastapi
 uvicorn[standard]
 sentence-transformers
 chromadb
-httpx
+groq
 pydantic-settings

@@ -1,6 +1,6 @@
 import { SourceChunk, QueryMetrics } from '../types';
 
-const BASE = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8080/api';
+const BASE = process.env.REACT_APP_API_URL ?? 'http://localhost:8080/api';
 
 export interface StreamCallbacks {
   onMeta: (queryId: string, sources: SourceChunk[]) => void;
@@ -28,8 +28,8 @@ export const queryStream = async (question: string, topK = 4, callbacks: StreamC
     buffer = lines.pop() ?? '';
 
     for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const json = JSON.parse(line.slice(6));
+      if (!line.startsWith('data:')) continue;
+      const json = JSON.parse(line.slice(5).trimStart());
       if (json.type === 'meta') {
         callbacks.onMeta(json.query_id, json.sources);
       } else if (json.type === 'text') {

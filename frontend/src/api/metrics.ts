@@ -1,6 +1,6 @@
 import { MetricsSummary, TimelinePoint, QueryLog } from '../types';
 
-const BASE = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8080/api';
+const BASE = process.env.REACT_APP_API_URL ?? 'http://localhost:8080/api';
 
 export const getMetricsSummary = async (): Promise<MetricsSummary> => {
   const resp = await fetch(`${BASE}/metrics/summary`);

@@ -1,6 +1,6 @@
 import { DocumentInfo } from '../types';
 
-const BASE = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8080/api';
+const BASE = process.env.REACT_APP_API_URL ?? 'http://localhost:8080/api';
 
 export interface UploadCallbacks {
   onStage: (message: string, done?: number, total?: number) => void;
@@ -25,8 +25,8 @@ export const uploadDocument = async (file: File, callbacks: UploadCallbacks): Pr
     buffer = lines.pop() ?? '';
 
     for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const json = JSON.parse(line.slice(6));
+      if (!line.startsWith('data:')) continue;
+      const json = JSON.parse(line.slice(5).trimStart());
       if (json.stage === 'done') {
         callbacks.onDone({
           doc_id: json.doc_id,
