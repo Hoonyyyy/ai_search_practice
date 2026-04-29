@@ -3,6 +3,7 @@ package com.ragsearch.controller;
 import com.ragsearch.dto.search.FeedbackRequestDto;
 import com.ragsearch.dto.search.QueryRequestDto;
 import com.ragsearch.service.SearchService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -20,7 +21,9 @@ public class SearchController {
     private final SearchService searchService;
 
     @PostMapping(value = "/query", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter query(@RequestBody @Valid QueryRequestDto request) {
+    public SseEmitter query(@RequestBody @Valid QueryRequestDto request, HttpServletResponse response) {
+        response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader("Cache-Control", "no-cache");
         return searchService.query(request.getQuestion(), request.getTopK());
     }
 

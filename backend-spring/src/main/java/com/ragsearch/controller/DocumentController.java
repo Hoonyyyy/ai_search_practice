@@ -2,6 +2,7 @@ package com.ragsearch.controller;
 
 import com.ragsearch.dto.document.DocumentDto;
 import com.ragsearch.service.DocumentService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +21,9 @@ public class DocumentController {
     private final DocumentService documentService;
 
     @PostMapping(value = "/upload", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter upload(@RequestParam("file") MultipartFile file) {
+    public SseEmitter upload(@RequestParam("file") MultipartFile file, HttpServletResponse response) {
+        response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader("Cache-Control", "no-cache");
         return documentService.upload(file);
     }
 

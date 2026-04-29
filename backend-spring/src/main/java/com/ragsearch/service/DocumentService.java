@@ -70,7 +70,20 @@ public class DocumentService {
 
                 // 3. Python AI 서비스로 임베딩 + ChromaDB 저장 (SSE 프록시)
                 String docId = UUID.randomUUID().toString();
-                aiServiceClient.embedAndStore(docId, file.getOriginalFilename(), chunks, emitter);
+                sendEvent(emitter, Map.of("stage", "embedding", "message", "임베딩 중... (처음 실행 시 30초 정도 소요될 수 있습니다)"));
+                // heartbeat: nginx 버퍼링 방지 및 cold start 대기 중 연결 유지
+                java.util.concurrent.ScheduledExecutorService heartbeatExecutor =
+                        java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+                heartbeatExecutor.scheduleAtFixedRate(() -> {
+                    try {
+                        emitter.send(SseEmitter.event().comment("heartbeat"));
+                    } catch (Exception ignored) {}
+                }, 5, 5, java.util.concurrent.TimeUnit.SECONDS);
+                try {
+                    aiServiceClient.embedAndStore(docId, file.getOriginalFilename(), chunks, emitter);
+                } finally {
+                    heartbeatExecutor.shutdownNow();
+                }
 
                 // 4. 문서 메타데이터 JPA 저장
                 Document document = Document.builder()
