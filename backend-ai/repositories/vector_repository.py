@@ -1,19 +1,18 @@
-"""Qdrant Cloud 벡터 데이터 접근 레이어."""
+"""Qdrant Cloud 벡터 데이터 접근 레이어. 임베딩은 Jina AI API 사용."""
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, VectorParams, PointStruct,
     Filter, FieldCondition, MatchValue,
 )
-from fastembed import TextEmbedding
+import requests
 from config import settings
-from typing import List, Dict, Any, Generator
+from typing import List, Dict, Any, Generator, Optional
 import uuid
 
 COLLECTION = "documents"
-VECTOR_SIZE = 384  # BAAI/bge-small-en-v1.5
+VECTOR_SIZE = 512  # jina-embeddings-v2-small-en
 
-_client: QdrantClient | None = None
-_embed_model: TextEmbedding | None = None
+_client: Optional[QdrantClient] = None
 
 
 def _get_client() -> QdrantClient:
@@ -26,7 +25,6 @@ def _get_client() -> QdrantClient:
                 collection_name=COLLECTION,
                 vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
             )
-        # doc_id 필터링(삭제/검색)에 필요한 payload 인덱스 — 없으면 400 에러
         _client.create_payload_index(
             collection_name=COLLECTION,
             field_name="doc_id",
@@ -35,15 +33,16 @@ def _get_client() -> QdrantClient:
     return _client
 
 
-def _get_model() -> TextEmbedding:
-    global _embed_model
-    if _embed_model is None:
-        _embed_model = TextEmbedding("BAAI/bge-small-en-v1.5")
-    return _embed_model
-
-
 def _embed(texts: List[str]) -> List[List[float]]:
-    return [v.tolist() for v in _get_model().embed(texts)]
+    resp = requests.post(
+        "https://api.jina.ai/v1/embeddings",
+        headers={"Authorization": f"Bearer {settings.jina_api_key}"},
+        json={"model": "jina-embeddings-v2-small-en", "input": texts},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()["data"]
+    return [item["embedding"] for item in sorted(data, key=lambda x: x["index"])]
 
 
 def add_chunks_stream(doc_id: str, filename: str, chunks: List[str]) -> Generator:
@@ -76,7 +75,6 @@ def add_chunks_stream(doc_id: str, filename: str, chunks: List[str]) -> Generato
 def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
     client = _get_client()
     query_vec = _embed([query])[0]
-    # qdrant-client 1.7+ 에서 client.search() 제거 → query_points() 사용
     result = client.query_points(
         collection_name=COLLECTION,
         query=query_vec,

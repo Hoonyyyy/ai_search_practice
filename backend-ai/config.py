@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     qdrant_url: str = ""
     qdrant_api_key: str = ""
     groq_api_key: str = ""
+    jina_api_key: str = ""
     groq_model: str = "llama-3.1-8b-instant"
     top_k: int = 4
 
