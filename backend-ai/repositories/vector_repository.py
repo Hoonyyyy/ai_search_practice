@@ -37,7 +37,7 @@ def _embed(texts: List[str]) -> List[List[float]]:
     resp = requests.post(
         "https://api.jina.ai/v1/embeddings",
         headers={"Authorization": f"Bearer {settings.jina_api_key}"},
-        json={"model": "jina-embeddings-v2-small-en", "input": texts},
+        json={"model": "jina-embeddings-v3", "input": texts, "dimensions": 512},
         timeout=30,
     )
     resp.raise_for_status()
