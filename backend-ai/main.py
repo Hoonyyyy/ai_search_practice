@@ -8,6 +8,6 @@ app.include_router(search.router, prefix="/ai")
 app.include_router(llm.router, prefix="/ai")
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health():
     return {"status": "ok"}
