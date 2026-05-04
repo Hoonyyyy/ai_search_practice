@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
-qdrant-client[fastembed]
+qdrant-client
+requests
 groq
 pydantic-settings
