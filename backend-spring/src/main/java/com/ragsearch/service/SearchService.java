@@ -37,7 +37,7 @@ public class SearchService {
      * 5. 완료 이벤트 전송
      */
     public SseEmitter query(String question, int topK) {
-        SseEmitter emitter = new SseEmitter(120_000L);
+        SseEmitter emitter = new SseEmitter(300_000L);
 
         sseExecutor.execute(() -> {
             String queryId = UUID.randomUUID().toString();

@@ -27,7 +27,7 @@ public class AiServiceClient {
     private String aiServiceUrl;
 
     // Render free tier cold start: nginx returns 502 immediately until the app wakes up (~30-50s)
-    private static final int MAX_RETRY = 12;
+    private static final int MAX_RETRY = 30;  // 30 × 5s = 150s (Render cold start 최대 90~120s)
     private static final long RETRY_MS = 5_000;
 
     private void waitForRetry(int attempt) {

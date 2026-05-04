@@ -44,7 +44,7 @@ public class DocumentService {
      * 텍스트 추출 → 청킹 → Python AI 서비스 호출(임베딩/저장) → JPA 저장
      */
     public SseEmitter upload(MultipartFile file) {
-        SseEmitter emitter = new SseEmitter(120_000L);
+        SseEmitter emitter = new SseEmitter(300_000L);
 
         sseExecutor.execute(() -> {
             try {
