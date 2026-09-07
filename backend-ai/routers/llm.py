@@ -19,7 +19,7 @@ class LlmStreamRequest(BaseModel):
 
 @router.post("/stream")
 def stream(req: LlmStreamRequest):
-    """Ollama LLM 응답을 SSE로 스트리밍. Spring Boot가 이를 프록시해 React에 전달한다."""
+    """LLM 응답을 SSE로 스트리밍. Spring Boot가 이를 프록시해 React에 전달한다."""
     return StreamingResponse(
         llm_service.stream_response(req.question, req.chunks),
         media_type="text/event-stream",

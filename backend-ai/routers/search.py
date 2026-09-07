@@ -16,6 +16,6 @@ class SearchRequest(BaseModel):
 
 @router.post("")
 def search(req: SearchRequest):
-    """쿼리와 유사한 청크를 ChromaDB에서 검색해 반환."""
+    """쿼리와 유사한 청크를 Qdrant에서 검색해 반환."""
     chunks = vector_repository.similarity_search(req.query, req.top_k)
     return {"chunks": chunks}

@@ -21,7 +21,7 @@ class EmbedAndStoreRequest(BaseModel):
 @router.post("/embed-and-store")
 def embed_and_store(req: EmbedAndStoreRequest):
     """
-    Spring Boot가 전달한 청크를 임베딩 후 ChromaDB에 저장.
+    Spring Boot가 전달한 청크를 임베딩 후 Qdrant에 저장.
     배치 단위로 진행률을 SSE로 스트리밍한다.
     """
     def generate():

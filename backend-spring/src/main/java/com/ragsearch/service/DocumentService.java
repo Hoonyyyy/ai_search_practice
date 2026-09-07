@@ -142,25 +142,54 @@ public class DocumentService {
         String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
         if (filename.endsWith(".pdf")) {
             try (PDDocument doc = Loader.loadPDF(file.getBytes())) {
-                return new PDFTextStripper().getText(doc);
+                PDFTextStripper stripper = new PDFTextStripper();
+                // 다단(컬럼) 레이아웃 PDF에서 텍스트가 좌→우, 상→하 순서로 읽히도록.
+                // 이력서·양식 문서처럼 컬럼이 많은 PDF의 추출 품질이 크게 좋아진다.
+                stripper.setSortByPosition(true);
+                return stripper.getText(doc);
             }
         }
-        return new String(file.getBytes());
+        return new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /**
-     * 텍스트를 chunkSize 크기로 분할. 청크 간 chunkOverlap 문자를 겹쳐서
-     * 문맥이 끊기지 않게 한다.
+     * 텍스트를 chunkSize 크기로 분할.
+     *
+     * 1) 줄 단위로 먼저 쪼갠 뒤 chunkSize 를 넘지 않게 이어붙인다 → 문장·줄이
+     *    중간에서 잘리지 않는다 (이력서·표처럼 줄 구조가 의미를 갖는 문서에 중요).
+     * 2) 한 줄이 chunkSize 보다 길면 그 줄만 문자 단위로 강제 분할한다.
+     * 3) 청크 사이에 chunkOverlap 문자를 겹쳐 문맥 단절을 줄인다.
      */
     private List<String> splitText(String text) {
+        String normalized = text.replace("\r\n", "\n").replace('\r', '\n');
         List<String> chunks = new ArrayList<>();
-        int start = 0;
-        while (start < text.length()) {
-            int end = Math.min(start + chunkSize, text.length());
-            chunks.add(text.substring(start, end).strip());
-            start += chunkSize - chunkOverlap;
+        StringBuilder cur = new StringBuilder();
+
+        for (String line : normalized.split("\n")) {
+            line = line.strip();
+            if (line.isEmpty()) continue;
+
+            if (line.length() > chunkSize) {
+                if (cur.length() > 0) { chunks.add(cur.toString()); cur.setLength(0); }
+                for (int i = 0; i < line.length(); i += chunkSize) {
+                    chunks.add(line.substring(i, Math.min(i + chunkSize, line.length())));
+                }
+                continue;
+            }
+
+            if (cur.length() + line.length() + 1 > chunkSize && cur.length() > 0) {
+                chunks.add(cur.toString());
+                String prev = cur.toString();
+                cur.setLength(0);
+                if (chunkOverlap > 0 && prev.length() > chunkOverlap) {
+                    cur.append(prev, prev.length() - chunkOverlap, prev.length()).append('\n');
+                }
+            }
+            cur.append(line).append('\n');
         }
-        return chunks.stream().filter(c -> !c.isBlank()).toList();
+        if (cur.length() > 0) chunks.add(cur.toString());
+
+        return chunks.stream().map(String::strip).filter(c -> !c.isBlank()).toList();
     }
 
     private void sendEvent(SseEmitter emitter, Map<String, Object> data) throws IOException {

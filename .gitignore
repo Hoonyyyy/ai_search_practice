@@ -8,6 +8,11 @@ backend-spring/data/
 # 로그 & 임시 파일
 logs/
 .ai_search_pids
+.ai_search_pids.json
+
+# IDE
+.idea/
+.vscode/
 
 # Python
 backend-ai/venv/

@@ -2,6 +2,80 @@
 
 ---
 
+## v4.0 — 완전 로컬 스택 전환
+
+### 배경
+- Render/Vercel 배포본이 동작 불능 (무료 티어 만료·외부 API 키 문제)
+- 개발·디버깅을 외부 API(Groq/Jina/Qdrant Cloud) 없이 로컬에서 완결하고 싶음
+
+### 변경 사항
+
+**backend-ai**
+- 임베딩: Jina AI API → **Ollama `nomic-embed-text`** (768차원). `_embed` 가 `/api/embed` 배치 호출
+- LLM: Groq API → **Ollama `llama3.2:3b`** (`/api/chat` 스트리밍). 토큰 수는 `prompt_eval_count`/`eval_count` 사용
+- 벡터 DB: Qdrant Cloud → **Qdrant 임베디드**(`QdrantClient(path=...)`, 로컬 파일). Docker·API 키 불필요
+  - `QDRANT_URL` 설정 시 원격 Qdrant 로 자동 전환 (하위호환)
+  - payload 인덱스는 원격 모드에서만 생성 (임베디드는 무의미 + 경고)
+- `config.py`: `ollama_base_url`, `llm_model`, `embed_model`, `embed_dim`, `qdrant_path` 추가
+- `requirements.txt`: 버전 핀 추가, `groq` 제거
+- `.env.example` 추가
+
+**backend-spring**
+- `pom.xml`: `java.version` 20 → **17** (설치된 JDK 17로 빌드, Spring Boot 3.2.3은 17 지원)
+
+**인프라/실행**
+- `start_search.ps1` / `stop_search.ps1` — Windows PowerShell 실행 스크립트 신규
+- `docker-compose.yml` — 로컬 스택 기준으로 재작성 (Ollama 호스트 접근, Qdrant 임베디드 볼륨, ChromaDB/키 환경변수 제거)
+- 낡은 주석 정리 (ChromaDB/Ollama-only 표현 → 현재 스택)
+
+---
+
+## v4.1 — RAG 품질/인코딩 디버깅 (한국어 문서)
+
+### 증상
+- 답변 품질이 낮고 환각이 심함, 응답이 느림 (이력서 PDF 기준)
+
+### 원인 및 조치
+
+**1. 한국어 깨짐 (MS949) — 가장 큰 원인**
+- 한국어 Windows 에서 JVM `file.encoding=MS949` → AI 서비스의 UTF-8 응답(SSE),
+  업로드 텍스트 파일, 멀티파트 파일명이 전부 깨져서 LLM 에 gibberish 컨텍스트가 들어감
+- `pom.xml` spring-boot-maven-plugin 에 `-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8`
+- `AiServiceClient`: `InputStreamReader` 에 `StandardCharsets.UTF_8` 명시 (2곳)
+- `DocumentService.extractText`: `new String(bytes, UTF_8)`
+- `Dockerfile`: JDK 20→17, `ENTRYPOINT` 에 UTF-8 플래그
+
+**2. 임베딩 모델이 한국어에서 사실상 무작위**
+- `nomic-embed-text` 는 영어 위주 → 한국어 쿼리·청크 유사도가 거의 구분 안 됨
+  (검증: 청크에 그대로 들어있는 문장을 쿼리해도 top-8 밖)
+- → `bge-m3` (다국어, 1024d) 로 교체. 동일 쿼리에서 정답 청크가 명확한 마진으로 1위
+
+**3. 청킹이 문장 중간을 자름**
+- 고정 500자 슬라이딩 → 줄 단위로 모아 700자까지 채우는 방식으로 변경 (`splitText`)
+- 이력서·표처럼 줄 구조가 의미를 갖는 문서에서 청크 경계가 자연스러워짐
+
+**4. 다단(컬럼) PDF 추출 순서 엉킴**
+- `PDFTextStripper.setSortByPosition(true)` — 좌→우, 상→하 순서로 추출
+
+**5. LLM**
+- `llama3.2:3b` → `qwen2.5:3b` (한국어 품질·속도 모두 우위, ~12 tok/s)
+- 프롬프트에 간결성 규칙 추가, `num_predict` 1024→640, `top_k` 6→4
+
+### 남은 한계 (하드웨어)
+- 이 PC: Intel Ultra 5 125H, 16GB, 디스크리트 GPU 없음 → Ollama 100% CPU
+- bge-m3(1.2GB) + qwen2.5:3b(2.2GB) 동시 로드 시 RAM 여유 부족 → 스와핑 → 응답 지연 편차 큼
+
+### 6. LLM provider 선택 + 소규모 문서 full-context (v4.1 후속)
+- `LLM_PROVIDER=ollama|groq` — 임베딩·벡터는 계속 로컬, 답변 생성만 Groq 클라우드로 오프로드 가능
+  - `_stream_ollama` / `_stream_groq` 분기, SSE 계약 동일
+  - 기본 모델 `openai/gpt-oss-120b`. gpt-oss 계열은 `reasoning_effort=low` 로 과잉 추론 억제
+    (안 하면 단답에도 10~17초). 적용 후 이력서 6질문 평균 3.1초 (Ollama CPU 는 25~70초)
+  - Groq 모델 목록이 자주 바뀜 — `llama-3.3-70b-versatile` 등 구 모델은 404. 콘솔에서 확인
+- `FULL_CONTEXT_THRESHOLD` (기본 12) — 컬렉션 청크 수가 이하이면 벡터 검색을 건너뛰고
+  전체 청크를 순서대로 컨텍스트에 넣는다. 문서 1~2개짜리 데모에서 검색 누락 제거
+
+---
+
 ## v3.4 — Qdrant Cloud 전환 + Render cold start 502 대응
 
 ### 배경
