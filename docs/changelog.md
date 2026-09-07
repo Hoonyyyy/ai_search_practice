@@ -68,7 +68,9 @@
 ### 6. LLM provider 선택 + 소규모 문서 full-context (v4.1 후속)
 - `LLM_PROVIDER=ollama|groq` — 임베딩·벡터는 계속 로컬, 답변 생성만 Groq 클라우드로 오프로드 가능
   - `_stream_ollama` / `_stream_groq` 분기, SSE 계약 동일
-  - Groq 사용 시 첫 토큰 <1초 (CPU Ollama 는 25~70초)
+  - 기본 모델 `openai/gpt-oss-120b`. gpt-oss 계열은 `reasoning_effort=low` 로 과잉 추론 억제
+    (안 하면 단답에도 10~17초). 적용 후 이력서 6질문 평균 3.1초 (Ollama CPU 는 25~70초)
+  - Groq 모델 목록이 자주 바뀜 — `llama-3.3-70b-versatile` 등 구 모델은 404. 콘솔에서 확인
 - `FULL_CONTEXT_THRESHOLD` (기본 12) — 컬렉션 청크 수가 이하이면 벡터 검색을 건너뛰고
   전체 청크를 순서대로 컨텍스트에 넣는다. 문서 1~2개짜리 데모에서 검색 누락 제거
 

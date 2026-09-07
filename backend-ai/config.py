@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     llm_provider: str = "ollama"
     llm_model: str = "qwen2.5:3b"          # ollama 용. 한국어 품질이 llama3.2:3b 보다 좋음
     groq_api_key: str = ""
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
 
     # ── 벡터 DB ───────────────────────────────────────────────
     # 기본: Qdrant 임베디드(로컬 파일). qdrant_url 설정 시 원격 전환.

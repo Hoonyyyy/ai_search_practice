@@ -72,7 +72,7 @@ def _stream_groq(question: str, chunks: List[Dict]) -> Generator[str, None, None
     from groq import Groq
 
     client = Groq(api_key=settings.groq_api_key)
-    stream = client.chat.completions.create(
+    kwargs = dict(
         model=settings.groq_model,
         messages=_messages(question, chunks),
         stream=True,
@@ -80,6 +80,10 @@ def _stream_groq(question: str, chunks: List[Dict]) -> Generator[str, None, None
         max_tokens=640,
         top_p=0.9,
     )
+    # gpt-oss 계열은 추론 모델 — RAG 추출형 질문엔 과한 추론이 지연만 늘린다.
+    if "gpt-oss" in settings.groq_model:
+        kwargs["reasoning_effort"] = "low"
+    stream = client.chat.completions.create(**kwargs)
     in_tok = out_tok = 0
     for chunk in stream:
         delta = chunk.choices[0].delta if chunk.choices else None
