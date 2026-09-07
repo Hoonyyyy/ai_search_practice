@@ -1,6 +1,5 @@
-fastapi
-uvicorn[standard]
-qdrant-client
-requests
-groq
-pydantic-settings
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.32,<0.35
+qdrant-client>=1.12,<2
+requests>=2.32,<3
+pydantic-settings>=2.6,<3

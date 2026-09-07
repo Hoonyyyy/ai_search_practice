@@ -1,8 +1,10 @@
-"""Groq LLM 스트리밍 서비스."""
+"""Ollama LLM 스트리밍 서비스."""
 import json
-from groq import Groq
-from config import settings
 from typing import List, Dict, Generator
+
+import requests
+
+from config import settings
 
 SYSTEM_PROMPT = """당신은 주어진 문서를 기반으로 질문에 답변하는 AI 어시스턴트입니다.
 
@@ -29,38 +31,40 @@ def _build_prompt(question: str, chunks: List[Dict]) -> str:
 
 
 def stream_response(question: str, chunks: List[Dict]) -> Generator[str, None, None]:
-    """Groq API에서 LLM 응답을 스트리밍하며 SSE 이벤트를 yield한다."""
-    client = Groq(api_key=settings.groq_api_key)
-
+    """Ollama API에서 LLM 응답을 스트리밍하며 SSE 이벤트를 yield한다."""
     try:
-        stream = client.chat.completions.create(
-            model=settings.groq_model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": _build_prompt(question, chunks)},
-            ],
+        resp = requests.post(
+            f"{settings.ollama_base_url}/api/chat",
+            json={
+                "model": settings.llm_model,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": _build_prompt(question, chunks)},
+                ],
+                "stream": True,
+                "options": {"temperature": 0.3, "top_p": 0.9, "num_predict": 1024},
+            },
             stream=True,
-            temperature=0.3,
-            max_tokens=1024,
-            top_p=0.9,
+            timeout=300,
         )
+        resp.raise_for_status()
 
         input_tokens = 0
         output_tokens = 0
 
-        for chunk in stream:
-            delta = chunk.choices[0].delta if chunk.choices else None
-            if delta and delta.content:
-                yield f"data: {json.dumps({'type': 'text', 'content': delta.content})}\n\n"
-            # Groq는 마지막 청크의 x_groq.usage에 토큰 정보를 담아 보낸다
-            if hasattr(chunk, 'x_groq') and chunk.x_groq:
-                usage = chunk.x_groq.usage
-                if usage:
-                    input_tokens = usage.prompt_tokens
-                    output_tokens = usage.completion_tokens
+        for line in resp.iter_lines():
+            if not line:
+                continue
+            data = json.loads(line)
+            content = data.get("message", {}).get("content")
+            if content:
+                yield f"data: {json.dumps({'type': 'text', 'content': content})}\n\n"
+            if data.get("done"):
+                input_tokens = data.get("prompt_eval_count", 0)
+                output_tokens = data.get("eval_count", 0)
 
         yield f"data: {json.dumps({'type': 'done', 'input_tokens': input_tokens, 'output_tokens': output_tokens})}\n\n"
 
     except Exception as e:
-        yield f"data: {json.dumps({'type': 'error', 'content': f'Groq API 오류: {str(e)}'})}\n\n"
+        yield f"data: {json.dumps({'type': 'error', 'content': f'Ollama API 오류: {str(e)}'})}\n\n"
         yield f"data: {json.dumps({'type': 'done', 'input_tokens': 0, 'output_tokens': 0})}\n\n"

@@ -2,6 +2,34 @@
 
 ---
 
+## v4.0 — 완전 로컬 스택 전환
+
+### 배경
+- Render/Vercel 배포본이 동작 불능 (무료 티어 만료·외부 API 키 문제)
+- 개발·디버깅을 외부 API(Groq/Jina/Qdrant Cloud) 없이 로컬에서 완결하고 싶음
+
+### 변경 사항
+
+**backend-ai**
+- 임베딩: Jina AI API → **Ollama `nomic-embed-text`** (768차원). `_embed` 가 `/api/embed` 배치 호출
+- LLM: Groq API → **Ollama `llama3.2:3b`** (`/api/chat` 스트리밍). 토큰 수는 `prompt_eval_count`/`eval_count` 사용
+- 벡터 DB: Qdrant Cloud → **Qdrant 임베디드**(`QdrantClient(path=...)`, 로컬 파일). Docker·API 키 불필요
+  - `QDRANT_URL` 설정 시 원격 Qdrant 로 자동 전환 (하위호환)
+  - payload 인덱스는 원격 모드에서만 생성 (임베디드는 무의미 + 경고)
+- `config.py`: `ollama_base_url`, `llm_model`, `embed_model`, `embed_dim`, `qdrant_path` 추가
+- `requirements.txt`: 버전 핀 추가, `groq` 제거
+- `.env.example` 추가
+
+**backend-spring**
+- `pom.xml`: `java.version` 20 → **17** (설치된 JDK 17로 빌드, Spring Boot 3.2.3은 17 지원)
+
+**인프라/실행**
+- `start_search.ps1` / `stop_search.ps1` — Windows PowerShell 실행 스크립트 신규
+- `docker-compose.yml` — 로컬 스택 기준으로 재작성 (Ollama 호스트 접근, Qdrant 임베디드 볼륨, ChromaDB/키 환경변수 제거)
+- 낡은 주석 정리 (ChromaDB/Ollama-only 표현 → 현재 스택)
+
+---
+
 ## v3.4 — Qdrant Cloud 전환 + Render cold start 502 대응
 
 ### 배경

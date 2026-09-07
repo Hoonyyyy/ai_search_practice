@@ -4,16 +4,23 @@
 
 ---
 
-## 현재 기술 스택
+## 현재 기술 스택 (v4.0 — 로컬)
 
 | 서비스 | 기술 | 위치 |
 |---|---|---|
-| 프론트엔드 | React + TypeScript | Vercel |
-| 메인 백엔드 | Spring Boot (Java) | Render |
-| AI 백엔드 | Python FastAPI | Render |
-| 벡터 DB | Qdrant Cloud | Qdrant Cloud (무료) |
-| LLM | Groq API (llama-3.1-8b) | Groq Cloud (무료) |
-| 임베딩 | Jina AI API (jina-embeddings-v3) | Jina Cloud (무료) |
+| 프론트엔드 | React + TypeScript | 로컬 :3000 |
+| 메인 백엔드 | Spring Boot 3.2 (Java 17) | 로컬 :8080 |
+| AI 백엔드 | Python FastAPI | 로컬 :8001 |
+| 벡터 DB | Qdrant 임베디드 (로컬 파일) | `backend-ai/data/qdrant` |
+| LLM | Ollama `llama3.2:3b` | 로컬 :11434 |
+| 임베딩 | Ollama `nomic-embed-text` (768d) | 로컬 :11434 |
+
+> `.env` 로 클라우드 전환 가능: `QDRANT_URL` 설정 시 원격 Qdrant 사용.
+> 임베딩·LLM 은 Ollama 고정 (클라우드로 되돌리려면 `_embed` / `llm_service` 수정 필요).
+
+**임베디드 Qdrant 제약**: 한 프로세스만 `data/qdrant` 를 열 수 있다.
+FastAPI 를 실행한 상태에서 별도 스크립트로 같은 폴더를 열면 lock 에러가 난다.
+동시 접근이 필요하면 Qdrant 서버(도커)로 전환.
 
 ---
 
@@ -23,18 +30,17 @@
 사용자 브라우저
     │  HTTP (REST + SSE)
     ▼
-React 프론트엔드 (Vercel)
+React 프론트엔드 (:3000)
     │  HTTP (REST + SSE)
     ▼
-Spring Boot 메인 백엔드 (Render, 8080)
+Spring Boot 메인 백엔드 (:8080)
     │  내부 HTTP
     ├──────────────────────────────────────┐
     ▼                                      ▼
-Python AI 백엔드 (Render, 8001)       H2 파일 DB (로컬)
+Python AI 백엔드 (:8001)              H2 파일 DB
     │                                  (문서 메타 + 쿼리 로그)
-    ├── Jina AI API  (임베딩 생성)
-    ├── Qdrant Cloud (벡터 저장/검색)
-    └── Groq API     (LLM 답변 생성)
+    ├── Ollama (:11434)  임베딩 + LLM
+    └── Qdrant 임베디드  벡터 저장/검색 (로컬 파일)
 ```
 
 **핵심 원칙**: 프론트엔드는 Spring Boot하고만 통신한다. Python AI 서비스는 Spring Boot가 내부적으로만 호출한다.
@@ -176,7 +182,8 @@ FastAPI 앱 시작점. 라우터 3개를 등록한다.
 
 ### `config.py`
 `.env` 파일에서 환경변수를 읽어 `settings` 객체로 제공한다.
-- `groq_api_key`, `qdrant_url`, `qdrant_api_key`, `jina_api_key`
+- `ollama_base_url`, `llm_model`, `embed_model`, `embed_dim`, `qdrant_path`
+- (선택) `qdrant_url`, `qdrant_api_key` — 원격 Qdrant 전환용
 
 ### `routers/documents.py`
 | 엔드포인트 | 역할 |
@@ -192,17 +199,17 @@ FastAPI 앱 시작점. 라우터 3개를 등록한다.
 ### `routers/llm.py`
 | 엔드포인트 | 역할 |
 |---|---|
-| `POST /ai/llm/stream` | Groq API로 LLM 답변 생성, SSE 스트리밍 |
+| `POST /ai/llm/stream` | Ollama로 LLM 답변 생성, SSE 스트리밍 |
 
 ### `repositories/vector_repository.py`
 Qdrant Cloud와 직접 통신하는 데이터 접근 레이어.
 
 | 함수 | 역할 |
 |---|---|
-| `_get_client()` | Qdrant 클라이언트 초기화 (컬렉션 없으면 자동 생성, doc_id 인덱스 생성) |
-| `_embed(texts)` | Jina AI API 호출해 텍스트 → 512차원 벡터 변환 |
+| `_get_client()` | Qdrant 클라이언트 초기화 (임베디드/원격 자동 선택, 컬렉션 없으면 생성) |
+| `_embed(texts, task)` | Ollama `/api/embed` 호출. `task` 로 nomic 접두사(`search_document:`/`search_query:`) 부여 |
 | `add_chunks_stream(doc_id, filename, chunks)` | 16개씩 배치로 임베딩 후 Qdrant 저장, 진행률 yield |
-| `similarity_search(query, top_k)` | 질문 임베딩 후 Qdrant에서 유사 청크 검색 |
+| `similarity_search(query, top_k)` | 질문 임베딩(`search_query`) 후 Qdrant에서 유사 청크 검색 |
 | `delete_document(doc_id)` | doc_id 필터로 Qdrant 벡터 삭제 |
 
 ### `services/llm_service.py`
@@ -210,7 +217,7 @@ Qdrant Cloud와 직접 통신하는 데이터 접근 레이어.
 | 함수 | 역할 |
 |---|---|
 | `_build_prompt(question, chunks)` | 검색된 청크들을 컨텍스트로 묶어 프롬프트 생성 |
-| `stream_response(question, chunks)` | Groq API에 스트리밍 요청, 토큰 단위로 SSE yield |
+| `stream_response(question, chunks)` | Ollama `/api/chat` 스트리밍, 토큰 단위로 SSE yield. 토큰수는 `prompt_eval_count`/`eval_count` |
 
 ---
 
@@ -229,11 +236,14 @@ Spring Boot의 `SseEmitter`가 SSE 연결을 관리하고, Python AI 서비스�
 
 ## 환경변수 목록
 
-| 변수 | 위치 | 용도 |
-|---|---|---|
-| `GROQ_API_KEY` | Python AI | Groq LLM API 인증 |
-| `QDRANT_URL` | Python AI | Qdrant Cloud 클러스터 주소 |
-| `QDRANT_API_KEY` | Python AI | Qdrant Cloud 인증 |
-| `JINA_API_KEY` | Python AI | Jina AI 임베딩 API 인증 |
-| `AI_SERVICE_URL` | Spring Boot | Python AI 서비스 주소 |
-| `CORS_ALLOWED_ORIGINS` | Spring Boot | Vercel 프론트엔드 도메인 허용 |
+| 변수 | 위치 | 기본값 | 용도 |
+|---|---|---|---|
+| `OLLAMA_BASE_URL` | Python AI | `http://localhost:11434` | Ollama 주소 |
+| `LLM_MODEL` | Python AI | `llama3.2:3b` | 답변 생성 모델 |
+| `EMBED_MODEL` | Python AI | `nomic-embed-text` | 임베딩 모델 |
+| `EMBED_DIM` | Python AI | `768` | 임베딩 차원 (모델 바꾸면 같이 수정) |
+| `QDRANT_PATH` | Python AI | `backend-ai/data/qdrant` | 임베디드 Qdrant 저장 경로 |
+| `QDRANT_URL` | Python AI | (없음) | 설정 시 원격 Qdrant 사용 |
+| `QDRANT_API_KEY` | Python AI | (없음) | 원격 Qdrant 인증 |
+| `AI_SERVICE_URL` | Spring Boot | `http://localhost:8001` | Python AI 서비스 주소 |
+| `CORS_ALLOWED_ORIGINS` | Spring Boot | `localhost:3000,3001` | 프론트엔드 도메인 허용 |
