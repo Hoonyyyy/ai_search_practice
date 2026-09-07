@@ -64,7 +64,13 @@
 ### 남은 한계 (하드웨어)
 - 이 PC: Intel Ultra 5 125H, 16GB, 디스크리트 GPU 없음 → Ollama 100% CPU
 - bge-m3(1.2GB) + qwen2.5:3b(2.2GB) 동시 로드 시 RAM 여유 부족 → 스와핑 → 응답 지연 편차 큼
-- 대안: (a) 다른 앱 종료로 RAM 확보 (b) LLM 만 Groq 클라우드로 오프로드 (c) 더 작은 임베딩 모델
+
+### 6. LLM provider 선택 + 소규모 문서 full-context (v4.1 후속)
+- `LLM_PROVIDER=ollama|groq` — 임베딩·벡터는 계속 로컬, 답변 생성만 Groq 클라우드로 오프로드 가능
+  - `_stream_ollama` / `_stream_groq` 분기, SSE 계약 동일
+  - Groq 사용 시 첫 토큰 <1초 (CPU Ollama 는 25~70초)
+- `FULL_CONTEXT_THRESHOLD` (기본 12) — 컬렉션 청크 수가 이하이면 벡터 검색을 건너뛰고
+  전체 청크를 순서대로 컨텍스트에 넣는다. 문서 1~2개짜리 데모에서 검색 누락 제거
 
 ---
 

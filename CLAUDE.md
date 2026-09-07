@@ -19,12 +19,13 @@ PDF/TXT/MD 문서를 업로드하면 임베딩 후 벡터 DB에 저장, 질문�
 | Frontend | React + TypeScript + CSS Modules | 3000 |
 | Backend (메인) | Spring Boot 3.2 + JPA/H2 (Java 17) | 8080 |
 | Backend (AI) | Python FastAPI | 8001 |
-| LLM | Ollama (`llama3.2:3b`) | 11434 |
-| 임베딩 | Ollama (`nomic-embed-text`, 768차원) | 11434 |
+| LLM | Ollama (`qwen2.5:3b`) 또는 Groq (`LLM_PROVIDER=groq`) | 11434 |
+| 임베딩 | Ollama (`bge-m3`, 1024차원) | 11434 |
 | 벡터 DB | Qdrant 임베디드 (로컬 파일, `backend-ai/data/qdrant`) | - |
 
-> 클라우드 스택(Jina/Qdrant Cloud/Groq)은 `.env` 로 전환 가능 — `backend-ai/.env.example` 참고.
-> `QDRANT_URL` 을 넣으면 원격 Qdrant, 그 외 임베딩/LLM 은 Ollama 고정.
+> `.env` 로 전환: `LLM_PROVIDER=groq`(+`GROQ_API_KEY`) 로 답변 생성만 클라우드로,
+> `QDRANT_URL` 로 원격 Qdrant. 임베딩은 항상 Ollama. `backend-ai/.env.example` 참고.
+> 이 PC는 GPU가 없어 로컬 LLM 이 느리다(25~70초) → 데모는 `LLM_PROVIDER=groq` 권장.
 
 ---
 

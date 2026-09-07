@@ -1,4 +1,4 @@
-"""Ollama LLM 스트리밍 서비스."""
+"""LLM 스트리밍 서비스. provider = ollama(로컬) | groq(클라우드)."""
 import json
 from typing import List, Dict, Generator
 
@@ -29,42 +29,76 @@ def _build_prompt(question: str, chunks: List[Dict]) -> str:
 {question}"""
 
 
+def _messages(question: str, chunks: List[Dict]) -> list:
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": _build_prompt(question, chunks)},
+    ]
+
+
+def _sse(obj: dict) -> str:
+    return f"data: {json.dumps(obj)}\n\n"
+
+
+def _stream_ollama(question: str, chunks: List[Dict]) -> Generator[str, None, None]:
+    resp = requests.post(
+        f"{settings.ollama_base_url}/api/chat",
+        json={
+            "model": settings.llm_model,
+            "messages": _messages(question, chunks),
+            "stream": True,
+            "keep_alive": settings.ollama_keep_alive,
+            "options": {"temperature": 0.2, "top_p": 0.9, "num_predict": 640, "num_ctx": 4096},
+        },
+        stream=True,
+        timeout=300,
+    )
+    resp.raise_for_status()
+    in_tok = out_tok = 0
+    for line in resp.iter_lines():
+        if not line:
+            continue
+        data = json.loads(line)
+        content = data.get("message", {}).get("content")
+        if content:
+            yield _sse({"type": "text", "content": content})
+        if data.get("done"):
+            in_tok = data.get("prompt_eval_count", 0)
+            out_tok = data.get("eval_count", 0)
+    yield _sse({"type": "done", "input_tokens": in_tok, "output_tokens": out_tok})
+
+
+def _stream_groq(question: str, chunks: List[Dict]) -> Generator[str, None, None]:
+    from groq import Groq
+
+    client = Groq(api_key=settings.groq_api_key)
+    stream = client.chat.completions.create(
+        model=settings.groq_model,
+        messages=_messages(question, chunks),
+        stream=True,
+        temperature=0.2,
+        max_tokens=640,
+        top_p=0.9,
+    )
+    in_tok = out_tok = 0
+    for chunk in stream:
+        delta = chunk.choices[0].delta if chunk.choices else None
+        if delta and delta.content:
+            yield _sse({"type": "text", "content": delta.content})
+        usage = getattr(chunk, "x_groq", None) and chunk.x_groq.usage
+        if usage:
+            in_tok = usage.prompt_tokens
+            out_tok = usage.completion_tokens
+    yield _sse({"type": "done", "input_tokens": in_tok, "output_tokens": out_tok})
+
+
 def stream_response(question: str, chunks: List[Dict]) -> Generator[str, None, None]:
-    """Ollama API에서 LLM 응답을 스트리밍하며 SSE 이벤트를 yield한다."""
+    """LLM 응답을 스트리밍하며 SSE 이벤트를 yield한다."""
     try:
-        resp = requests.post(
-            f"{settings.ollama_base_url}/api/chat",
-            json={
-                "model": settings.llm_model,
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": _build_prompt(question, chunks)},
-                ],
-                "stream": True,
-                "keep_alive": settings.ollama_keep_alive,
-                "options": {"temperature": 0.2, "top_p": 0.9, "num_predict": 640, "num_ctx": 4096},
-            },
-            stream=True,
-            timeout=300,
-        )
-        resp.raise_for_status()
-
-        input_tokens = 0
-        output_tokens = 0
-
-        for line in resp.iter_lines():
-            if not line:
-                continue
-            data = json.loads(line)
-            content = data.get("message", {}).get("content")
-            if content:
-                yield f"data: {json.dumps({'type': 'text', 'content': content})}\n\n"
-            if data.get("done"):
-                input_tokens = data.get("prompt_eval_count", 0)
-                output_tokens = data.get("eval_count", 0)
-
-        yield f"data: {json.dumps({'type': 'done', 'input_tokens': input_tokens, 'output_tokens': output_tokens})}\n\n"
-
+        if settings.llm_provider == "groq":
+            yield from _stream_groq(question, chunks)
+        else:
+            yield from _stream_ollama(question, chunks)
     except Exception as e:
-        yield f"data: {json.dumps({'type': 'error', 'content': f'Ollama API 오류: {str(e)}'})}\n\n"
-        yield f"data: {json.dumps({'type': 'done', 'input_tokens': 0, 'output_tokens': 0})}\n\n"
+        yield _sse({"type": "error", "content": f"LLM({settings.llm_provider}) 오류: {e}"})
+        yield _sse({"type": "done", "input_tokens": 0, "output_tokens": 0})

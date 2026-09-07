@@ -103,8 +103,28 @@ def add_chunks_stream(doc_id: str, filename: str, chunks: List[str]) -> Generato
         yield end, total
 
 
+def _to_dict(payload: Dict[str, Any], score: float) -> Dict[str, Any]:
+    return {
+        "content": payload["content"],
+        "metadata": {
+            "doc_id": payload["doc_id"],
+            "filename": payload["filename"],
+            "chunk_index": payload["chunk_index"],
+        },
+        "distance": 1.0 - score,
+    }
+
+
 def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
     client = _get_client()
+    total = client.count(collection_name=COLLECTION).count
+
+    # 청크가 얼마 없으면 검색 자체가 손해 — 전부 넣고 순서만 정렬한다.
+    if 0 < total <= settings.full_context_threshold:
+        pts, _ = client.scroll(collection_name=COLLECTION, limit=total, with_payload=True)
+        pts.sort(key=lambda p: (p.payload["doc_id"], p.payload["chunk_index"]))
+        return [_to_dict(p.payload, 1.0) for p in pts]
+
     query_vec = _embed([query], task="search_query")[0]
     result = client.query_points(
         collection_name=COLLECTION,
@@ -112,18 +132,7 @@ def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
         limit=top_k,
         with_payload=True,
     )
-    return [
-        {
-            "content": h.payload["content"],
-            "metadata": {
-                "doc_id": h.payload["doc_id"],
-                "filename": h.payload["filename"],
-                "chunk_index": h.payload["chunk_index"],
-            },
-            "distance": 1.0 - h.score,
-        }
-        for h in result.points
-    ]
+    return [_to_dict(h.payload, h.score) for h in result.points]
 
 
 def delete_document(doc_id: str) -> None:

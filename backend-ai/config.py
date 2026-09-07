@@ -5,25 +5,29 @@ BASE_DIR = Path(__file__).parent
 
 
 class Settings(BaseSettings):
-    # ── 로컬 스택 (기본값) ─────────────────────────────────────
-    # Ollama: LLM + 임베딩 모두 담당
+    # ── 임베딩 (항상 Ollama) ──────────────────────────────────
     ollama_base_url: str = "http://localhost:11434"
-    llm_model: str = "qwen2.5:3b"          # 한국어 품질이 llama3.2:3b 보다 크게 좋음
     embed_model: str = "bge-m3"            # 다국어 임베딩. nomic-embed-text 는 한국어에서 사실상 무작위
     embed_dim: int = 1024                  # bge-m3 출력 차원
+    ollama_keep_alive: str = "10m"         # 세션 중 모델 재로딩(cold start) 방지. RAM 빠듯하면 "5m"
 
-    # Qdrant: 임베디드(로컬 파일) 모드. 경로가 비어 있으면 in-memory.
+    # ── LLM (provider 선택) ───────────────────────────────────
+    # "ollama" = 완전 로컬(느림, CPU). "groq" = 클라우드(빠름, GROQ_API_KEY 필요).
+    llm_provider: str = "ollama"
+    llm_model: str = "qwen2.5:3b"          # ollama 용. 한국어 품질이 llama3.2:3b 보다 좋음
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+
+    # ── 벡터 DB ───────────────────────────────────────────────
+    # 기본: Qdrant 임베디드(로컬 파일). qdrant_url 설정 시 원격 전환.
     qdrant_path: str = str(BASE_DIR / "data" / "qdrant")
-
-    # ── 클라우드 스택 (선택) ───────────────────────────────────
-    # qdrant_url 이 설정되면 임베디드 대신 원격 Qdrant 를 쓴다.
     qdrant_url: str = ""
     qdrant_api_key: str = ""
 
     top_k: int = 4
-    # 모델을 메모리에 유지하는 시간. 세션 중 재로딩(cold start)을 막는다.
-    # RAM 여유가 많으면 "-1"(계속 유지), 빠듯하면 "5m" 로.
-    ollama_keep_alive: str = "10m"
+    # 컬렉션 전체 청크 수가 이 값 이하면 검색을 건너뛰고 전부 컨텍스트로 넣는다.
+    # (한두 개 문서만 올리는 데모에서 검색 누락을 없앤다)
+    full_context_threshold: int = 12
 
     class Config:
         env_file = ".env"
