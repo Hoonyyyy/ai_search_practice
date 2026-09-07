@@ -1,7 +1,8 @@
 # AI Search — Claude 작업 가이드
 
 이 파일을 읽으면 지금까지의 모든 작업 맥락을 파악할 수 있습니다.
-자세한 내역은 `docs/changelog.md`, 코드 흐름은 `docs/code_guide.md`를 참고하세요.
+자세한 내역은 `docs/changelog.md`, 코드 흐름은 `docs/code_guide.md`,
+디버깅 방법은 `docs/debugging.md`, API 수동 테스트는 루트 `api.http` 를 참고하세요.
 
 ---
 
