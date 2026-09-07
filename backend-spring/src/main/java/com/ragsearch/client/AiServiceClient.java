@@ -12,6 +12,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -60,7 +61,7 @@ public class AiServiceClient {
                         },
                         resp -> {
                             try (BufferedReader reader = new BufferedReader(
-                                    new InputStreamReader(resp.getBody()))) {
+                                    new InputStreamReader(resp.getBody(), StandardCharsets.UTF_8))) {
                                 String line;
                                 while ((line = reader.readLine()) != null) {
                                     if (line.startsWith("data: ")) {

@@ -9,11 +9,10 @@ from config import settings
 SYSTEM_PROMPT = """당신은 주어진 문서를 기반으로 질문에 답변하는 AI 어시스턴트입니다.
 
 규칙:
-1. 반드시 제공된 컨텍스트(문서 내용)만을 근거로 답변하세요.
-2. 컨텍스트에 없는 내용은 "제공된 문서에서 해당 정보를 찾을 수 없습니다."라고 답하세요.
-3. 답변은 한국어로 작성하세요.
-4. 출처가 되는 문서 내용을 간략히 인용하며 설명하세요.
-5. 명확하고 구조적으로 답변하세요."""
+1. 반드시 제공된 컨텍스트(문서 내용)만을 근거로 답변하세요. 추측하거나 지어내지 마세요.
+2. 컨텍스트에 근거가 없으면 "제공된 문서에서 해당 정보를 찾을 수 없습니다."라고만 답하세요.
+3. 답변은 한국어로, 질문에 필요한 만큼만 간결하게 작성하세요. 불필요한 배경 설명이나 사족은 붙이지 마세요.
+4. 목록형 질문은 목록으로, 단답형 질문은 한두 문장으로 답하세요."""
 
 
 def _build_prompt(question: str, chunks: List[Dict]) -> str:
@@ -42,7 +41,8 @@ def stream_response(question: str, chunks: List[Dict]) -> Generator[str, None, N
                     {"role": "user", "content": _build_prompt(question, chunks)},
                 ],
                 "stream": True,
-                "options": {"temperature": 0.3, "top_p": 0.9, "num_predict": 1024},
+                "keep_alive": settings.ollama_keep_alive,
+                "options": {"temperature": 0.2, "top_p": 0.9, "num_predict": 640, "num_ctx": 4096},
             },
             stream=True,
             timeout=300,

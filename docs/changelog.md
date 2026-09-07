@@ -30,6 +30,44 @@
 
 ---
 
+## v4.1 — RAG 품질/인코딩 디버깅 (한국어 문서)
+
+### 증상
+- 답변 품질이 낮고 환각이 심함, 응답이 느림 (이력서 PDF 기준)
+
+### 원인 및 조치
+
+**1. 한국어 깨짐 (MS949) — 가장 큰 원인**
+- 한국어 Windows 에서 JVM `file.encoding=MS949` → AI 서비스의 UTF-8 응답(SSE),
+  업로드 텍스트 파일, 멀티파트 파일명이 전부 깨져서 LLM 에 gibberish 컨텍스트가 들어감
+- `pom.xml` spring-boot-maven-plugin 에 `-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8`
+- `AiServiceClient`: `InputStreamReader` 에 `StandardCharsets.UTF_8` 명시 (2곳)
+- `DocumentService.extractText`: `new String(bytes, UTF_8)`
+- `Dockerfile`: JDK 20→17, `ENTRYPOINT` 에 UTF-8 플래그
+
+**2. 임베딩 모델이 한국어에서 사실상 무작위**
+- `nomic-embed-text` 는 영어 위주 → 한국어 쿼리·청크 유사도가 거의 구분 안 됨
+  (검증: 청크에 그대로 들어있는 문장을 쿼리해도 top-8 밖)
+- → `bge-m3` (다국어, 1024d) 로 교체. 동일 쿼리에서 정답 청크가 명확한 마진으로 1위
+
+**3. 청킹이 문장 중간을 자름**
+- 고정 500자 슬라이딩 → 줄 단위로 모아 700자까지 채우는 방식으로 변경 (`splitText`)
+- 이력서·표처럼 줄 구조가 의미를 갖는 문서에서 청크 경계가 자연스러워짐
+
+**4. 다단(컬럼) PDF 추출 순서 엉킴**
+- `PDFTextStripper.setSortByPosition(true)` — 좌→우, 상→하 순서로 추출
+
+**5. LLM**
+- `llama3.2:3b` → `qwen2.5:3b` (한국어 품질·속도 모두 우위, ~12 tok/s)
+- 프롬프트에 간결성 규칙 추가, `num_predict` 1024→640, `top_k` 6→4
+
+### 남은 한계 (하드웨어)
+- 이 PC: Intel Ultra 5 125H, 16GB, 디스크리트 GPU 없음 → Ollama 100% CPU
+- bge-m3(1.2GB) + qwen2.5:3b(2.2GB) 동시 로드 시 RAM 여유 부족 → 스와핑 → 응답 지연 편차 큼
+- 대안: (a) 다른 앱 종료로 RAM 확보 (b) LLM 만 Groq 클라우드로 오프로드 (c) 더 작은 임베딩 모델
+
+---
+
 ## v3.4 — Qdrant Cloud 전환 + Render cold start 502 대응
 
 ### 배경

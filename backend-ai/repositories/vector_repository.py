@@ -65,7 +65,11 @@ def _embed(texts: List[str], task: str = "search_document") -> List[List[float]]
     prefix = f"{task}: " if settings.embed_model.startswith("nomic-embed") else ""
     resp = requests.post(
         f"{settings.ollama_base_url}/api/embed",
-        json={"model": settings.embed_model, "input": [prefix + t for t in texts]},
+        json={
+            "model": settings.embed_model,
+            "input": [prefix + t for t in texts],
+            "keep_alive": settings.ollama_keep_alive,
+        },
         timeout=120,
     )
     resp.raise_for_status()
