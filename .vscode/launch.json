@@ -1,0 +1,26 @@
+{
+  // VS Code 디버깅 설정. F5 로 실행. 자세한 내용: docs/debugging.md
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // FastAPI(AI 서비스) 디버그. 브레이크포인트: vector_repository.py, llm_service.py
+      "name": "FastAPI (uvicorn)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["main:app", "--port", "8001", "--reload"],
+      "cwd": "${workspaceFolder}/backend-ai",
+      "python": "${workspaceFolder}/backend-ai/venv/Scripts/python.exe",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      // 실행 중인 Chrome 의 React 앱에 붙기 (먼저 npm start 로 3000 띄워둘 것)
+      "name": "React (Chrome, attach)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/frontend/src"
+    }
+  ]
+}

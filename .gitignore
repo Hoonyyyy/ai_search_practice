@@ -12,7 +12,9 @@ logs/
 
 # IDE
 .idea/
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/extensions.json
 
 # Python
 backend-ai/venv/
