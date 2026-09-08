@@ -16,7 +16,7 @@ window.Office = (() => {
   };
   const STATUS_LABEL = {
     desk: "", thinking: "생각 중…", talking: "말하는 중",
-    meeting: "회의 중", warn: "⚠",
+    meeting: "회의 중", warn: "⚠", break: "☕",
   };
 
   // 책상이 바라보는 방향 (아바타/의자 배치용)
@@ -385,10 +385,17 @@ window.Office = (() => {
     ctx.fillStyle = "rgba(40,26,14,0.82)"; rr(X - 22, Y + 17, 44, 13, 4); ctx.fill();
     ctx.fillStyle = "#fdf3e2"; ctx.fillText(nick, X, Y + 26);
 
-    const label = STATUS_LABEL[a.status];
-    if (label) {
-      ctx.fillStyle = a.status === "warn" ? "#e5484d" : "#5a4632";
-      ctx.font = "9px monospace"; ctx.fillText(label, X, Y - 22);
+    if (a.status === "break") {
+      // 머리 위 커피컵
+      ctx.fillStyle = "#f2ede0"; rr(X + 8, Y - 20, 8, 7, 1); ctx.fill();
+      ctx.strokeStyle = "#c98b5a"; ctx.strokeRect(X + 8, Y - 20, 8, 7);
+      ctx.fillStyle = "#7a4a2a"; ctx.fillRect(X + 9, Y - 19, 6, 2);
+    } else {
+      const label = STATUS_LABEL[a.status];
+      if (label) {
+        ctx.fillStyle = a.status === "warn" ? "#e5484d" : "#5a4632";
+        ctx.font = "9px monospace"; ctx.fillText(label, X, Y - 22);
+      }
     }
   }
 
@@ -425,8 +432,8 @@ window.Office = (() => {
 
     bubbles = bubbles.filter((b) => b.until > now);
     for (const a of Object.values(actors)) {
-      a.cx += (a.x - a.cx) * 0.12;
-      a.cy += (a.y - a.cy) * 0.12;
+      a.cx += (a.x - a.cx) * 0.055;
+      a.cy += (a.y - a.cy) * 0.055;
     }
     Object.entries(actors).sort((p, q) => p[1].cy - q[1].cy)
       .forEach(([nick, a]) => drawAvatar(nick, a, now));

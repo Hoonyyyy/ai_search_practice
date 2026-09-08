@@ -7,8 +7,12 @@
   <header>
     <span class="brand">🏢 후니네 팀</span>
     <input id="topic" placeholder="회의 주제 — 예: bge-m3 한국어 검색 정확도 올리기">
-    <label>라운드
-      <select id="rounds"><option>1</option><option selected>2</option><option>3</option></select>
+    <label title="각 동료가 몇 바퀴 발언할지 — 길수록 깊게 논의하지만 오래 걸려요">회의 길이
+      <select id="rounds">
+        <option value="1">짧게 (1바퀴)</option>
+        <option value="2" selected>보통 (2바퀴)</option>
+        <option value="3">깊게 (3바퀴)</option>
+      </select>
     </label>
     <button id="summon">회의 소집</button>
     <button id="endmtg" class="ghost" hidden>회의 종료</button>

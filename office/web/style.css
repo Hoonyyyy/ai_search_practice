@@ -83,9 +83,11 @@ button.mini, button.ghost.mini {
 /* ── layout: canvas + side panel ── */
 main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1fr) 400px;
   min-height: 0;
+  min-width: 0;
 }
+main > * { min-width: 0; }
 
 #stage {
   background:
@@ -108,6 +110,7 @@ main {
   grid-template-rows: 1fr 1fr;
   border-left: 1px solid var(--line);
   min-height: 0;
+  overflow: hidden;
 }
 #chatbox, #boardbox {
   display: flex;
@@ -119,9 +122,10 @@ main {
 
 .panel-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 2px 8px;
   padding: 8px 12px;
   font-size: 11px;
   font-weight: 700;
@@ -131,6 +135,7 @@ main {
   border-bottom: 1px solid var(--line);
 }
 .panel-head .hint {
+  flex-basis: 100%;
   text-transform: none;
   letter-spacing: 0;
   font-weight: 500;
@@ -148,6 +153,7 @@ main {
 #chat .msg {
   padding: 5px 0;
   border-bottom: 1px solid rgba(255,255,255,.04);
+  overflow-wrap: anywhere;
 }
 #chat .msg .who {
   font-weight: 700;
@@ -200,6 +206,7 @@ main {
   margin-bottom: 6px;
   font-size: 12px;
   cursor: grab;
+  overflow-wrap: anywhere;
 }
 #board .card:last-child { margin-bottom: 0; }
 #board .card .who { color: var(--ink-dim); display: block; margin-top: 3px; font-size: 11px; }

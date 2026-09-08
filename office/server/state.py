@@ -1,4 +1,7 @@
 """사무실 상태 — 아바타 목표 좌표 + 상태값. JSON 영속."""
+import random
+import time
+
 from paths import read_json, write_json
 from personas import COLLEAGUES
 
@@ -14,7 +17,14 @@ MEETING_SEATS = {
     "Victoria": (18, 4), "Sophia": (18, 6),
     "Michelle": (24, 4), "Chloe": (24, 6), "후니": (21, 2),
 }
-STATUSES = {"desk", "thinking", "talking", "meeting", "warn"}
+STATUSES = {"desk", "thinking", "talking", "meeting", "warn", "break"}
+
+# 회의가 없을 때 잠깐 다녀오는 곳들 (탕비실·정수기·책장·소파·창가)
+POIS = {
+    "coffee": (18, 11), "water": (13, 13), "snack": (22, 10),
+    "pantry_table": (21, 14), "bookshelf": (7, 13),
+    "sofa": (4, 14), "window": (6, 2), "printer": (11, 11),
+}
 
 
 def _default() -> dict:
@@ -77,9 +87,44 @@ def summon_all() -> dict:
 
 def dismiss_all() -> dict:
     state = get_state()
+    now = time.time()
     for n in _NICKS:
         state["actors"][n]["x"], state["actors"][n]["y"] = DESKS[n]
         state["actors"][n]["status"] = "desk"
+        state["actors"][n]["goal"] = "desk"
+        state["actors"][n]["until"] = now + random.uniform(8, 20)
     state["meeting_id"] = None
     _save(state)
+    return state
+
+
+def ambient_step(now: float) -> dict:
+    """회의가 없을 때 동료 한 명씩 잠깐 탕비실 등에 다녀오게 한다. 주기적으로 호출."""
+    state = get_state()
+    if state.get("meeting_id"):
+        return state
+    changed = False
+    for n in _NICKS:
+        a = state["actors"][n]
+        if a["status"] not in ("desk", "break"):
+            continue
+        if now < a.get("until", 0):
+            continue
+        if a.get("goal", "desk") == "desk":
+            # 후니는 덜 돌아다니고, 나머지는 가끔
+            if random.random() < (0.12 if n == "후니" else 0.22):
+                poi = random.choice(list(POIS))
+                a["x"], a["y"] = POIS[poi]
+                a["status"] = "break"
+                a["goal"] = poi
+                a["until"] = now + random.uniform(5, 11)
+                changed = True
+        else:
+            a["x"], a["y"] = DESKS[n]
+            a["status"] = "desk"
+            a["goal"] = "desk"
+            a["until"] = now + random.uniform(10, 28)
+            changed = True
+    if changed:
+        _save(state)
     return state

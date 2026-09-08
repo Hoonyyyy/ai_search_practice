@@ -1,10 +1,33 @@
+import asyncio
+import time
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+import state
 from config import settings, OFFICE_DIR
 from routers import board, meeting, office
 
-app = FastAPI(title="Office", version="0.1.0")
+
+async def _ambient_loop():
+    """회의가 없을 때 동료들이 탕비실 등을 오가게 하는 백그라운드 루프."""
+    while True:
+        await asyncio.sleep(3.5)
+        try:
+            state.ambient_step(time.time())
+        except Exception:  # noqa: BLE001 — 루프는 절대 안 죽는다
+            pass
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_ambient_loop())
+    yield
+    task.cancel()
+
+
+app = FastAPI(title="Office", version="0.1.0", lifespan=lifespan)
 
 app.include_router(office.router)
 app.include_router(meeting.router)
