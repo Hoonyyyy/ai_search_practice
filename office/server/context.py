@@ -14,7 +14,7 @@ _BRIEF = Path(__file__).resolve().parent.parent / "context" / "brief.md"
 def _git_log() -> str:
     try:
         out = subprocess.run(
-            ["git", "log", "--oneline", "-20"],
+            ["git", "log", "--oneline", "-10"],
             cwd=settings.repo_root_path,
             capture_output=True, timeout=5,
             encoding="utf-8", errors="replace",  # 한국어 커밋 메시지: 로케일(cp949) 디코딩 금지
@@ -47,8 +47,10 @@ def _tree(root: Path, depth: int = 2) -> str:
 
 def assemble_brief() -> str:
     brief_md = _BRIEF.read_text(encoding="utf-8") if _BRIEF.exists() else ""
-    return (
+    full = (
         f"{brief_md}\n\n"
-        f"## 최근 커밋 (git log -20)\n{_git_log()}\n\n"
-        f"## 레포 구조\n{_tree(settings.repo_root_path)}"
+        f"## 최근 커밋\n{_git_log()}\n\n"
+        f"## 레포 구조 (상위)\n{_tree(settings.repo_root_path, depth=1)}"
     )
+    # 토큰 절약 — 회의 프롬프트에 매 턴 들어가므로 상한을 둔다
+    return full[:2400]

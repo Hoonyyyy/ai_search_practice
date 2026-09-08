@@ -3,6 +3,7 @@ const $ = (id) => document.getElementById(id);
 let currentMeetingId = null;
 let aborter = null;
 let totalTurns = 8;
+let lastSummary = "";
 
 function setStatus(t) { $("status").textContent = t; }
 
@@ -97,16 +98,20 @@ function handleEvent(ev) {
     setStatus(`회의 중… ${ev.seq}/${totalTurns} 발언`);
   } else if (ev.type === "summary") {
     setStatus("의견 정리 중…");
+    lastSummary = ev.text;
     Chat.add("📋 요약", ev.text, "system");
   } else if (ev.type === "cards") {
     Chat.add("🗂 보드", `액션 아이템 ${ev.cards.length}개를 카드로 만들었어요.`, "system");
     Board.refresh();
+    Board.showResult(lastSummary, ev.cards);
   } else if (ev.type === "cancelled") {
     Chat.add("⏹ 중단", ev.message, "system");
     setStatus("회의 중단됨");
+    meetingUI(false);
   } else if (ev.type === "error") {
     Chat.add("⚠ 오류", ev.message, "system");
-    setStatus("오류: " + ev.message);
+    setStatus("오류 — 잠시 후 다시 시도하세요");
+    meetingUI(false);
   }
 }
 

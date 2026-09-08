@@ -38,8 +38,9 @@ window.Office = (() => {
         cx: prev ? prev.cx : a.x, cy: prev ? prev.cy : a.y,
       };
     }
-    if (!Object.keys(desks).length) {
-      for (const [nick, a] of Object.entries(state.actors)) desks[nick] = { x: a.x, y: a.y };
+    // 책상은 서버가 준 고정 좌표. 캐릭터가 어디 있든 항상 제자리.
+    if (state.desks) {
+      for (const [nick, xy] of Object.entries(state.desks)) desks[nick] = { x: xy[0], y: xy[1] };
     }
     if (!running) { running = true; requestAnimationFrame(loop); }
   }

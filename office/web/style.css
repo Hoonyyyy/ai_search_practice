@@ -205,30 +205,88 @@ main > * { min-width: 0; }
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 7px 8px;
   margin-bottom: 6px;
   font-size: 12px;
-  cursor: grab;
   overflow-wrap: anywhere;
 }
 #board .card:last-child { margin-bottom: 0; }
-#board .card .who { color: var(--ink-dim); display: block; margin-top: 3px; font-size: 11px; }
-#board .card details { margin-top: 5px; }
-#board .card summary {
-  cursor: pointer;
-  font-size: 10.5px;
-  color: var(--tag-test);
-}
-#board .card pre {
+#board .card-head { padding: 7px 8px; cursor: pointer; }
+#board .card-head:hover { background: rgba(255,255,255,.03); }
+#board .card-body { padding: 0 8px 8px; font-size: 11.5px; }
+#board .card-body p { color: var(--ink-dim); margin: 4px 0; }
+#board .card-body .who { color: var(--ink-dim); margin: 4px 0; }
+#board .card-body .snip-label { color: var(--tag-test); font-size: 10.5px; margin-top: 5px; }
+#board .card-body pre,
+#modalBody pre {
   margin-top: 4px;
-  padding: 6px;
+  padding: 7px 8px;
   background: #0d1017;
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 10.5px;
-  line-height: 1.4;
+  line-height: 1.45;
   overflow-x: auto;
   white-space: pre;
 }
+#board .card-move { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+#board .card-move .mini { background: var(--panel-2); color: var(--ink); }
+
+/* 회의 결과 모달 */
+#modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(8,10,14,.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 50;
+}
+#modal[hidden] { display: none; }
+#modal .sheet {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  width: min(560px, 100%);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+#modal .sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 700;
+}
+#modalBody { padding: 14px; overflow-y: auto; }
+#modalBody .modal-summary {
+  background: var(--panel-2);
+  border-left: 3px solid var(--accent);
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+#modalBody .modal-sub {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--ink-dim);
+  margin-bottom: 8px;
+}
+#modalBody .card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+#modalBody .card-head { padding: 8px 10px; }
+#modalBody .card-body { padding: 0 10px 10px; }
+#modalBody .card-move { display: none; }
 .tag {
   display: inline-block;
   padding: 1px 6px;
