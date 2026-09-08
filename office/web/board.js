@@ -1,4 +1,4 @@
-// 업무 보드 — 4열, 드래그로 열 이동.
+// 업무 보드 — 4열, 드래그로 열 이동. 동료 제안 코드는 접힌 채로 카드에 표시.
 window.Board = (() => {
   const el = document.getElementById("board");
   const COLS = [
@@ -15,8 +15,7 @@ window.Board = (() => {
     for (const [key, label] of COLS) {
       const col = document.createElement("div");
       col.className = "col";
-      col.dataset.col = key;
-      col.innerHTML = `<h4>${label}</h4>`;
+      col.innerHTML = `<h4>${label} · ${cards.filter((c) => c.column === key).length}</h4>`;
       col.addEventListener("dragover", (e) => e.preventDefault());
       col.addEventListener("drop", async (e) => {
         e.preventDefault();
@@ -29,9 +28,7 @@ window.Board = (() => {
         });
         refresh();
       });
-      for (const c of cards.filter((c) => c.column === key)) {
-        col.appendChild(cardEl(c));
-      }
+      for (const c of cards.filter((c) => c.column === key)) col.appendChild(cardEl(c));
       el.appendChild(col);
     }
   }
@@ -41,18 +38,25 @@ window.Board = (() => {
     card.className = "card";
     card.draggable = true;
     card.addEventListener("dragstart", (e) => e.dataTransfer.setData("id", c.id));
+
     const tag = document.createElement("span");
     tag.className = "tag " + c.tag;
     tag.textContent = c.tag;
-    card.appendChild(tag);
-    card.appendChild(document.createTextNode(" " + c.title));
-    const who = document.createElement("small");
-    who.textContent = "@" + c.assignee;
+    card.append(tag, document.createTextNode(" " + c.title));
+
+    const who = document.createElement("span");
+    who.className = "who";
+    who.textContent = "담당 @" + c.assignee;
     card.appendChild(who);
+
     if (c.draft_snippet && c.draft_snippet.code) {
+      const d = document.createElement("details");
+      const s = document.createElement("summary");
+      s.textContent = "💡 " + (c.draft_snippet.lang || "code") + " 제안 (파일엔 미반영)";
       const pre = document.createElement("pre");
       pre.textContent = c.draft_snippet.code;
-      card.appendChild(pre);
+      d.append(s, pre);
+      card.appendChild(d);
     }
     return card;
   }

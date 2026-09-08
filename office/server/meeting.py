@@ -13,6 +13,15 @@ from config import settings
 
 _MID_RE = re.compile(r"^[0-9a-f]{32}$")
 
+# 진행 중 회의를 중단하려고 표시해 둔 id 들. run_meeting 이 발언 사이에서 확인한다.
+_cancelled: set[str] = set()
+
+
+def cancel(mid: str) -> None:
+    if not _MID_RE.match(mid):
+        raise ValueError(f"bad meeting id: {mid!r}")
+    _cancelled.add(mid)
+
 
 def _mdir():
     d = settings.data_dir / "meetings"  # data_dir 을 매번 조회 (테스트 격리)
@@ -76,6 +85,12 @@ def run_meeting(topic: str, rounds: int = 2) -> Iterator[dict]:
     try:
         for _ in range(rounds):
             for c in personas.COLLEAGUES:
+                if mid in _cancelled:
+                    _cancelled.discard(mid)
+                    rec["status"] = "cancelled"
+                    _save(rec)
+                    yield {"type": "cancelled", "message": "회의를 중단했습니다"}
+                    return
                 text = _retry_stream(
                     personas.turn_messages(c, brief, rec["turns"], topic)
                 ).strip()
@@ -118,3 +133,5 @@ def run_meeting(topic: str, rounds: int = 2) -> Iterator[dict]:
         rec["status"] = "incomplete"
         _save(rec)
         yield {"type": "error", "message": f"Groq 오류: {e}"}
+    finally:
+        _cancelled.discard(mid)

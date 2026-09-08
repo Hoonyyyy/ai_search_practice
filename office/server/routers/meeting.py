@@ -32,6 +32,16 @@ def start_meeting(req: MeetingReq):
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
+@router.post("/meeting/{mid}/cancel")
+def cancel_meeting(mid: str):
+    try:
+        meeting.cancel(mid)
+    except ValueError:
+        raise HTTPException(404, "meeting not found")
+    state.dismiss_all()
+    return {"cancelled": mid}
+
+
 @router.get("/meeting/{mid}")
 def get_meeting(mid: str):
     try:
