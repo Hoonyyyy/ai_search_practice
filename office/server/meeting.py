@@ -11,15 +11,19 @@ import groq_client
 import personas
 from config import settings
 
-_MDIR = settings.data_dir / "meetings"
 _MID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _mdir():
+    d = settings.data_dir / "meetings"  # data_dir 을 매번 조회 (테스트 격리)
+    d.mkdir(exist_ok=True)
+    return d
 
 
 def _mpath(mid: str):
     if not _MID_RE.match(mid):
         raise ValueError(f"bad meeting id: {mid!r}")
-    _MDIR.mkdir(exist_ok=True)
-    return _MDIR / f"{mid}.json"
+    return _mdir() / f"{mid}.json"
 
 
 def get_meeting(mid: str) -> dict | None:
