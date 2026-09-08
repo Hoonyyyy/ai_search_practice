@@ -5,14 +5,14 @@ from personas import COLLEAGUES
 _FILE = "office.json"
 _NICKS = [c.nick for c in COLLEAGUES] + ["후니"]
 
-# 격자 좌표 (타일 단위, 24x16 그리드). 웹이 TILE 을 곱해 픽셀로 렌더한다.
+# 격자 좌표 (타일 단위, 28x18 그리드). 웹이 TILE 을 곱해 픽셀로 렌더한다.
 DESKS = {
-    "Victoria": (3, 3), "Sophia": (3, 8),
-    "Michelle": (8, 3), "Chloe": (8, 8), "후니": (12, 6),
+    "Victoria": (3, 4), "Sophia": (3, 9),
+    "Michelle": (9, 4), "Chloe": (9, 9), "후니": (13, 6),
 }
 MEETING_SEATS = {
-    "Victoria": (16, 4), "Sophia": (16, 6),
-    "Michelle": (21, 4), "Chloe": (21, 6), "후니": (18, 2),
+    "Victoria": (18, 4), "Sophia": (18, 6),
+    "Michelle": (24, 4), "Chloe": (24, 6), "후니": (21, 2),
 }
 STATUSES = {"desk", "thinking", "talking", "meeting", "warn"}
 

@@ -103,13 +103,20 @@ def run_meeting(topic: str, rounds: int = 2) -> Iterator[dict]:
         data = groq_client.complete_json(
             personas.extract_messages(brief, rec["turns"], topic)
         )
-        rec["summary"] = data.get("summary", "")
+        rec["summary"] = str(data.get("summary", "")) if isinstance(data, dict) else ""
+        rec["status"] = "summarized"
+        _save(rec)
         yield {"type": "summary", "text": rec["summary"]}
 
+        items = data.get("action_items", []) if isinstance(data, dict) else []
         made: list[dict] = []
-        for item in data.get("action_items", []):
+        for item in items:
+            if not isinstance(item, dict) or "title" not in item:
+                continue
             try:
                 snippet = item.get("draft_snippet")
+                if not isinstance(snippet, dict):
+                    snippet = None
                 if not snippet:
                     for t in rec["turns"]:
                         snippet = _first_code_block(t["text"])
@@ -122,7 +129,7 @@ def run_meeting(topic: str, rounds: int = 2) -> Iterator[dict]:
                     tag=item.get("tag", "feature"),
                     draft_snippet=snippet,
                 ))
-            except (KeyError, ValueError, TypeError):
+            except (KeyError, ValueError, TypeError, AttributeError):
                 continue
         rec["cards"] = made
         rec["status"] = "done"
@@ -133,5 +140,9 @@ def run_meeting(topic: str, rounds: int = 2) -> Iterator[dict]:
         rec["status"] = "incomplete"
         _save(rec)
         yield {"type": "error", "message": f"Groq 오류: {e}"}
+    except Exception as e:  # noqa: BLE001 — 스트림을 500 대신 error 이벤트로 닫는다
+        rec["status"] = "incomplete"
+        _save(rec)
+        yield {"type": "error", "message": f"회의 처리 오류: {e}"}
     finally:
         _cancelled.discard(mid)

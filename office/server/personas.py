@@ -70,7 +70,9 @@ def extract_messages(brief: str, transcript: list[dict], topic: str) -> list[dic
             '"assignee": "Victoria|Sophia|Michelle|Chloe|후니", '
             '"tag": "test|security|feature|fix|spike", '
             '"draft_snippet": {"lang": str, "code": str} | null}]}. '
-            "테스트·보안 항목의 assignee 는 반드시 후니. 코드가 논의됐으면 draft_snippet 채움."
+            "summary 와 각 title·detail 은 반드시 한국어로 쓴다. "
+            "action_items 의 각 원소는 반드시 위 형식의 객체다(문자열 금지). "
+            "테스트·보안 항목의 assignee 는 반드시 후니. 코드가 논의됐으면 draft_snippet 을 채운다."
         )},
         {"role": "user", "content": f"# 주제\n{topic}\n\n# 회의록\n{_transcript_text(transcript)}"},
     ]
