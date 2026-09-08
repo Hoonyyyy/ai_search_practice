@@ -20,3 +20,16 @@ def test_forced_assignee_for_test_and_security_tags():
     # feature 태그는 지정한 담당자 유지
     c3 = board.add_card("보드 UI 개선", tag="feature", assignee="Michelle")
     assert c3["assignee"] == "Michelle"
+
+
+def test_add_card_appears_in_list():
+    # conftest.py 의 tmp_data fixture 덕분에 매 테스트는 빈 보드로 시작한다.
+    assert board.list_cards() == []           # 시작: 카드 0개
+
+    board.add_card("청킹 로직 리팩터", tag="feature", assignee="Victoria")
+
+    cards = board.list_cards()
+    assert len(cards) == 1                    # 이제 1개
+    assert cards[0]["title"] == "청킹 로직 리팩터"
+    assert cards[0]["assignee"] == "Victoria"
+    assert cards[0]["column"] == "todo"       # add_card 기본 컬럼
