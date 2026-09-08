@@ -29,7 +29,7 @@ def stream_turn(messages: list[dict]) -> Iterator[str]:
     """한 명의 발언을 텍스트 델타로 스트리밍."""
     try:
         stream = _client().chat.completions.create(
-            stream=True, max_tokens=320, **_kwargs(messages)
+            stream=True, max_tokens=240, **_kwargs(messages)
         )
         for chunk in stream:
             delta = chunk.choices[0].delta if chunk.choices else None

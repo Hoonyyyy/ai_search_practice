@@ -15,6 +15,7 @@ async def _ambient_loop():
     while True:
         await asyncio.sleep(3.5)
         try:
+            state.reap_stale_meeting()
             state.ambient_step(time.time())
         except Exception:  # noqa: BLE001 — 루프는 절대 안 죽는다
             pass

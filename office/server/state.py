@@ -19,11 +19,15 @@ MEETING_SEATS = {
 }
 STATUSES = {"desk", "thinking", "talking", "meeting", "warn", "break"}
 
-# 회의가 없을 때 잠깐 다녀오는 곳들 (탕비실·정수기·책장·소파·창가)
+# 회의가 없을 때 잠깐 다녀오는 곳들. 좌표는 web office.js 의 가구 위치와 맞춘다.
 POIS = {
-    "coffee": (18, 11), "water": (13, 13), "snack": (22, 10),
-    "pantry_table": (21, 14), "bookshelf": (7, 13),
-    "sofa": (4, 14), "window": (6, 2), "printer": (11, 11),
+    "coffee": (18, 10),       # 커피 머신
+    "water": (12, 13),        # 정수기 (라운지)
+    "snack": (22, 10),        # 스낵 선반
+    "pantry_seat_a": (20, 14),  # 탕비실 원형 식탁
+    "pantry_seat_b": (23, 14),
+    "bookshelf": (7, 13),     # 책장
+    "sofa": (5, 14),          # 소파
 }
 
 
@@ -72,8 +76,39 @@ def send_to(nick: str, xy: tuple[int, int]) -> dict:
 def set_meeting(mid: str | None) -> dict:
     state = get_state()
     state["meeting_id"] = mid
+    state["meeting_started"] = time.time() if mid else 0
+    state["meeting_progress"] = ""
     _save(state)
     return state
+
+
+def set_progress(text: str) -> None:
+    state = get_state()
+    if state.get("meeting_id"):
+        state["meeting_progress"] = text
+        _save(state)
+
+
+def reap_stale_meeting(max_age: float = 150.0) -> bool:
+    """새로고침 등으로 SSE가 끊겨 meeting_id 가 남아버린 경우를 청소한다."""
+    state = get_state()
+    mid = state.get("meeting_id")
+    if not mid:
+        return False
+    age = time.time() - state.get("meeting_started", 0)
+    stale = age > max_age
+    if not stale:
+        # 회의 기록이 이미 끝났는데 상태만 남은 경우
+        try:
+            import meeting as _m
+            rec = _m.get_meeting(mid)
+            if rec and rec.get("status") not in ("running", "summarized"):
+                stale = True
+        except Exception:  # noqa: BLE001
+            pass
+    if stale:
+        dismiss_all()
+    return stale
 
 
 def summon_all() -> dict:
@@ -111,19 +146,20 @@ def ambient_step(now: float) -> dict:
         if now < a.get("until", 0):
             continue
         if a.get("goal", "desk") == "desk":
-            # 후니는 덜 돌아다니고, 나머지는 가끔
-            if random.random() < (0.12 if n == "후니" else 0.22):
+            # 대부분 자리에서 일하고, 가끔만 탕비실 등에 다녀온다
+            if random.random() < (0.03 if n == "후니" else 0.08):
                 poi = random.choice(list(POIS))
                 a["x"], a["y"] = POIS[poi]
                 a["status"] = "break"
                 a["goal"] = poi
-                a["until"] = now + random.uniform(5, 11)
+                a["until"] = now + random.uniform(4, 8)   # 잠깐 있다가
                 changed = True
         else:
+            # 볼일 봤으면 반드시 자리로 복귀해 한참 일한다
             a["x"], a["y"] = DESKS[n]
             a["status"] = "desk"
             a["goal"] = "desk"
-            a["until"] = now + random.uniform(10, 28)
+            a["until"] = now + random.uniform(30, 70)
             changed = True
     if changed:
         _save(state)

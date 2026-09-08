@@ -51,6 +51,7 @@ window.Office = (() => {
       .replace(/\s+/g, " ").trim();
     bubbles = bubbles.filter((b) => b.nick !== nick);
     bubbles.push({ nick, lines: wrap(clean, 30).slice(0, 3), until: performance.now() + 6500 });
+    if (bubbles.length > 2) bubbles = bubbles.slice(-2);   // 최근 발언 2개만
     if (actors[nick]) actors[nick].status = "talking";
   }
 

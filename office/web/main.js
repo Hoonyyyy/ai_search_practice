@@ -2,13 +2,26 @@
 const $ = (id) => document.getElementById(id);
 let currentMeetingId = null;
 let aborter = null;
+let totalTurns = 8;
 
 function setStatus(t) { $("status").textContent = t; }
+
+let localMeeting = false;   // 이 탭이 회의를 돌리는 중인가
 
 async function poll() {
   try {
     const s = await fetch("/office/state").then((r) => r.json());
     Office.render(s);
+    // 다른 곳(새로고침 전 탭 등)에서 시작된 회의가 남아있는 경우
+    if (!localMeeting) {
+      if (s.meeting_id) {
+        setStatus("이전 회의 정리 중… 잠시 후 다시 시도하세요");
+        $("summon").disabled = true;
+      } else if ($("summon").disabled && $("endmtg").hidden) {
+        $("summon").disabled = false;
+        setStatus("");
+      }
+    }
   } catch { /* 서버 재시작 중 등 */ }
 }
 
@@ -23,7 +36,9 @@ async function runMeeting() {
   const topic = $("topic").value.trim();
   if (!topic) { setStatus("주제를 입력하세요"); return; }
   const rounds = Number($("rounds").value);
+  totalTurns = rounds * 4;
 
+  localMeeting = true;
   meetingUI(true);
   setStatus("소집 중…");
   Chat.clear();
@@ -79,7 +94,9 @@ function handleEvent(ev) {
   } else if (ev.type === "turn") {
     Chat.add(ev.speaker, ev.text);
     Office.say(ev.speaker, ev.text);
+    setStatus(`회의 중… ${ev.seq}/${totalTurns} 발언`);
   } else if (ev.type === "summary") {
+    setStatus("의견 정리 중…");
     Chat.add("📋 요약", ev.text, "system");
   } else if (ev.type === "cards") {
     Chat.add("🗂 보드", `액션 아이템 ${ev.cards.length}개를 카드로 만들었어요.`, "system");
@@ -107,6 +124,7 @@ function endMeetingUI() {
   meetingUI(false);
   currentMeetingId = null;
   aborter = null;
+  localMeeting = false;
 }
 
 $("summon").addEventListener("click", runMeeting);

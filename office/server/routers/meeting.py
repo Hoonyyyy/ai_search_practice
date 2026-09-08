@@ -1,8 +1,9 @@
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from starlette.concurrency import iterate_in_threadpool
 
 import meeting
 import state
@@ -16,15 +17,32 @@ class MeetingReq(BaseModel):
 
 
 @router.post("/meeting")
-def start_meeting(req: MeetingReq):
+async def start_meeting(req: MeetingReq, request: Request):
+    state.reap_stale_meeting()  # 새로고침 등으로 남은 유령 회의 청소
     if state.get_state().get("meeting_id"):
         raise HTTPException(409, "이미 진행 중인 회의가 있습니다")
 
-    def gen():
+    total_turns = req.rounds * len(meeting.personas.COLLEAGUES)
+
+    async def gen():
+        mid = None
+        turn = 0
         try:
-            for ev in meeting.run_meeting(req.topic, req.rounds):
+            async for ev in iterate_in_threadpool(meeting.run_meeting(req.topic, req.rounds)):
                 if ev["type"] == "start":
-                    state.set_meeting(ev["meeting_id"])
+                    mid = ev["meeting_id"]
+                    state.set_meeting(mid)
+                elif ev["type"] == "turn":
+                    turn += 1
+                    state.set_progress(f"{turn}/{total_turns}")
+                elif ev["type"] == "summary":
+                    state.set_progress("정리 중")
+
+                if await request.is_disconnected():
+                    if mid:
+                        meeting.cancel(mid)
+                    break
+
                 yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
         finally:
             state.dismiss_all()
