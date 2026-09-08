@@ -1,4 +1,28 @@
 <!doctype html>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Office</title>
-<h1>Office booting…</h1>
+<link rel="stylesheet" href="style.css">
+<div id="app">
+  <header>
+    <span class="brand">🏢 후니네 팀</span>
+    <input id="topic" placeholder="회의 주제를 입력하고 소집하세요 — 예: bge-m3 한국어 검색 정확도 올리기">
+    <label>라운드 <select id="rounds"><option>1</option><option selected>2</option><option>3</option></select></label>
+    <button id="summon">회의 소집</button>
+    <span id="status"></span>
+  </header>
+  <main>
+    <div id="stage">
+      <canvas id="floor" width="640" height="416"></canvas>
+    </div>
+    <section id="board"></section>
+  </main>
+  <footer>
+    <div class="chat-head">팀 채팅</div>
+    <div id="chat"></div>
+  </footer>
+</div>
+<script src="office.js"></script>
+<script src="chat.js"></script>
+<script src="board.js"></script>
+<script src="main.js"></script>
