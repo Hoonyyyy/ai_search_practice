@@ -42,3 +42,12 @@ def patch(card_id: str, p: PatchCard):
         raise HTTPException(404, "card not found")
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@router.delete("/board/cards/{card_id}")
+def remove(card_id: str):
+    try:
+        board.delete_card(card_id)
+    except KeyError:
+        raise HTTPException(404, "card not found")
+    return {"deleted": card_id}

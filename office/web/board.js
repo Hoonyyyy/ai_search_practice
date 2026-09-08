@@ -34,7 +34,19 @@ window.Board = (() => {
     const tag = document.createElement("span");
     tag.className = "tag " + c.tag;
     tag.textContent = c.tag;
-    head.append(tag, document.createTextNode(" " + c.title));
+    const title = document.createElement("span");
+    title.className = "card-title";
+    title.textContent = " " + c.title;
+    const del = document.createElement("button");
+    del.className = "card-x";
+    del.textContent = "×";
+    del.title = "카드 삭제";
+    del.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await fetch(`/board/cards/${c.id}`, { method: "DELETE" });
+      refresh();
+    });
+    head.append(tag, title, del);
     card.appendChild(head);
 
     const body = document.createElement("div");

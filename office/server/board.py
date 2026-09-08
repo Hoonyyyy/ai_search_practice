@@ -72,3 +72,11 @@ def patch_card(card_id: str, *, column: str | None = None,
             _save(cards)
             return c
     raise KeyError(card_id)
+
+
+def delete_card(card_id: str) -> None:
+    cards = list_cards()
+    kept = [c for c in cards if c["id"] != card_id]
+    if len(kept) == len(cards):
+        raise KeyError(card_id)
+    _save(kept)
