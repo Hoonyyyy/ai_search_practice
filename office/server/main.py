@@ -37,9 +37,14 @@ app.include_router(board.router)
 
 @app.get("/health")
 def health():
+    # 설정만 확인 (실 API 호출 없음)
+    if settings.office_provider.lower() == "ollama":
+        ready = True  # 로컬 — 회의 시작 시 실패하면 그때 안내
+    else:
+        ready = bool(settings.groq_api_key)
     return {
-        "status": "ok" if settings.groq_api_key else "degraded",
-        "has_key": bool(settings.groq_api_key),
+        "status": "ok" if ready else "degraded",
+        "provider": settings.office_provider,
     }
 
 

@@ -139,7 +139,7 @@ def run_meeting(topic: str, rounds: int = 2) -> Iterator[dict]:
     except groq_client.GroqError as e:
         rec["status"] = "incomplete"
         _save(rec)
-        yield {"type": "error", "message": f"Groq 오류: {e}"}
+        yield {"type": "error", "message": str(e)}
     except Exception as e:  # noqa: BLE001 — 스트림을 500 대신 error 이벤트로 닫는다
         rec["status"] = "incomplete"
         _save(rec)

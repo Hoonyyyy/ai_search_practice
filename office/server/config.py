@@ -10,8 +10,12 @@ class Settings(BaseSettings):
         env_file=str(OFFICE_DIR / ".env"), extra="ignore"
     )
 
+    # 동료들의 두뇌 — "groq"(빠름, 일일 토큰 한도) | "ollama"(로컬, 무료·무제한, 느림)
+    office_provider: str = "groq"
     groq_api_key: str = ""
-    office_model: str = "openai/gpt-oss-120b"
+    office_model: str = "openai/gpt-oss-20b"
+    ollama_base_url: str = "http://localhost:11434"
+    office_ollama_model: str = "qwen2.5:3b"
     office_port: int = 8899
     repo_root: str = ""
 

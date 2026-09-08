@@ -53,4 +53,4 @@ def assemble_brief() -> str:
         f"## 레포 구조 (상위)\n{_tree(settings.repo_root_path, depth=1)}"
     )
     # 토큰 절약 — 회의 프롬프트에 매 턴 들어가므로 상한을 둔다
-    return full[:2400]
+    return full[:1800]

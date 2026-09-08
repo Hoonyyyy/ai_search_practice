@@ -16,6 +16,18 @@ python -m venv server\venv
 server\venv\Scripts\pip install -r server\requirements.txt
 ```
 
+## 동료들의 두뇌 (LLM)
+
+`office/.env` 의 `OFFICE_PROVIDER`:
+
+| | 속도 | 비용 | 비고 |
+|---|---|---|---|
+| `groq` (기본) | 빠름 (발언당 2~5초) | 무료, **일일 토큰 한도** (초과 시 회의 불가, 매일 리셋) | `GROQ_API_KEY` 필요 |
+| `ollama` | 느림 (발언당 20~60초, GPU 없을 때) | 무료·무제한·오프라인 | rag_search 와 같은 로컬 Ollama (`qwen2.5:3b`) |
+
+평소엔 `groq`, 한도가 터지면 `.env` 에서 `OFFICE_PROVIDER=ollama` 로 바꾸고 서버 재시작.
+동료 회의만 토큰을 쓴다 — 캐릭터 움직임·보드·채팅 UI 는 LLM 과 무관하게 공짜로 돈다.
+
 ## 실행
 
 ```powershell

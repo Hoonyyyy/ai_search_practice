@@ -13,8 +13,10 @@ class Colleague:
 _RULES = (
     "회의 규칙: (1) 2~3문장으로 짧게. 장황하게 쓰지 말 것. "
     "(2) 자기 역할 관점에서만. (3) 팀장 '후니'에게 존대. "
-    "(4) 코드는 꼭 필요할 때만 5~10줄 코드블록으로. 매번 코드를 넣지 말 것. "
-    "(5) 이미 나온 말 반복 금지, 구체적인 다음 행동 하나를 제시."
+    "(4) 당신은 실제 코드베이스를 보지 못한다. 그러니 완성된 코드를 쓰지 말고, "
+    "'무엇을·어디를·왜' 바꿔야 하는지 방향과 고려사항, 확인할 점을 말하라. "
+    "정말 필요하면 3~5줄짜리 의사코드(pseudocode)만 허용. "
+    "(5) 이미 나온 말 반복 금지. 구체적인 다음 행동 하나를 제시."
 )
 
 COLLEAGUES = [
@@ -47,8 +49,9 @@ def by_nick(nick: str) -> Colleague | None:
     return next((c for c in COLLEAGUES if c.nick == nick), None)
 
 
-def _transcript_text(transcript: list[dict]) -> str:
-    return "\n".join(f"{t['speaker']}: {t['text']}" for t in transcript) or "(아직 발언 없음)"
+def _transcript_text(transcript: list[dict], limit: int = 6) -> str:
+    recent = transcript[-limit:]  # 토큰 절약: 최근 발언만
+    return "\n".join(f"{t['speaker']}: {t['text']}" for t in recent) or "(아직 발언 없음)"
 
 
 def turn_messages(c: Colleague, brief: str, transcript: list[dict], topic: str) -> list[dict]:
@@ -73,7 +76,9 @@ def extract_messages(brief: str, transcript: list[dict], topic: str) -> list[dic
             '"draft_snippet": {"lang": str, "code": str} | null}]}. '
             "summary 와 각 title·detail 은 반드시 한국어로 쓴다. "
             "action_items 의 각 원소는 반드시 위 형식의 객체다(문자열 금지). "
-            "테스트·보안 항목의 assignee 는 반드시 후니. 코드가 논의됐으면 draft_snippet 을 채운다."
+            "detail 은 '무엇을 왜 어떻게(방향)' + '구현 전 확인할 점'을 담는다. "
+            "draft_snippet 은 회의에서 나온 짧은 의사코드가 있을 때만 채우고, 없으면 null. "
+            "테스트·보안 항목의 assignee 는 반드시 후니."
         )},
-        {"role": "user", "content": f"# 주제\n{topic}\n\n# 회의록\n{_transcript_text(transcript)}"},
+        {"role": "user", "content": f"# 주제\n{topic}\n\n# 회의록\n{_transcript_text(transcript, limit=99)}"},
     ]
