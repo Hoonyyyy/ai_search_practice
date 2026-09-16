@@ -2,6 +2,49 @@
 
 ---
 
+## v4.3 — 새 PC 환경 세팅 자동화
+
+### 배경
+- 노트북 외에 GPU(GTX 1660 Super) 있는 데스크탑에서도 동일하게 작업하고 싶은데,
+  Ollama 모델 재설치·venv·npm install·.env 를 손으로 하면 오래 걸리고 누락되기 쉬움
+- `CLAUDE.md`/`start_search.ps1`의 "사전 준비" 안내가 예전 모델명(`llama3.2:3b`,
+  `nomic-embed-text`)을 그대로 가리키고 있어 실제 기본값(`qwen2.5:3b`, `bge-m3`)과 어긋나 있었음
+
+### 변경 사항
+- `setup.ps1` 신규: python/node/mvn/java/ollama PATH 확인 → Ollama 모델
+  (`bge-m3`, `qwen2.5:3b`) pull → `backend-ai\venv` + requirements 설치 →
+  `frontend\node_modules` 설치 → `backend-ai\.env` 생성까지 한 번에. 이미 되어있는
+  항목은 스킵하므로 재실행해도 안전
+- `CLAUDE.md`, `start_search.ps1`의 사전 준비 안내를 `setup.ps1` 실행 + 현재 모델명으로 수정
+
+---
+
+## v4.2 — 회귀 테스트 인프라 구축 (진행 중)
+
+### 배경
+- v4.0~v4.1의 RAG 품질 수정들이 회귀 테스트 없이 이루어져, 앞으로 리팩토링하다가
+  같은 버그가 재발해도 잡을 안전망이 없었음
+- 후니가 테스트 작성을 직접 익히고 싶어함 — 체크리스트만 주는 방식은 안 통해서
+  작은 실행 가능한 토이 예제로 monkeypatch 등 개념을 먼저 보여주는 방식으로 진행
+
+### 변경 사항
+- `pytest` 설치 및 `requirements.txt` 반영
+- `backend-ai/tests/` 신설, 5단계 난이도별 테스트 사다리로 진행:
+  1. `test_config.py` — `settings.embed_model/embed_dim/full_context_threshold` 기본값 회귀 (완료)
+  2. `test_pure_functions.py` — `llm_service._build_prompt`/`._messages`,
+     `vector_repository._to_dict` 순수 함수 (완료)
+  3. `vector_repository._embed` prefix 로직, `requests.post` monkeypatch (진행 중)
+  4. `similarity_search` threshold 분기, fake Qdrant client (예정)
+  5. `stream_response` 에러 경로 (예정)
+- 실행: `./venv/Scripts/python.exe -m pytest tests/ -v` (bare `pytest`는 `backend-ai`가
+  `sys.path`에 없어 `from config import settings` 실패)
+
+**함께 수정 (별개 이슈):** `start_search.ps1`/`stop_search.ps1`/`office/run.ps1`/`office/stop.ps1`에
+UTF-8 BOM 누락 — Windows PowerShell 5.1이 한글을 MS949로 읽어 문자열 종료가 깨지면서
+스크립트가 실행되지 않던 문제, BOM 추가로 수정.
+
+---
+
 ## v4.0 — 완전 로컬 스택 전환
 
 ### 배경

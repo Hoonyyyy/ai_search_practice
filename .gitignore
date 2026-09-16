@@ -7,6 +7,7 @@ backend-spring/data/
 
 # 로그 & 임시 파일
 logs/
+office/logs_office.*.txt
 .ai_search_pids
 .ai_search_pids.json
 

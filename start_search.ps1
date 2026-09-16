@@ -1,9 +1,6 @@
-# AI Search 전체 서비스 시작 (Windows / PowerShell)
+﻿# AI Search 전체 서비스 시작 (Windows / PowerShell)
 #   실행: powershell -ExecutionPolicy Bypass -File .\start_search.ps1
-# 사전 조건:
-#   - Ollama 실행 중 + `ollama pull llama3.2:3b`, `ollama pull nomic-embed-text`
-#   - backend-ai\venv 생성 및 requirements 설치
-#   - frontend\node_modules 설치 (npm install)
+# 사전 조건: 최초 1회 .\setup.ps1 실행 (Ollama 모델 pull, venv, npm install, .env 생성)
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path

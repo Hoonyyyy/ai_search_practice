@@ -1,0 +1,60 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Office</title>
+<link rel="stylesheet" href="style.css">
+<div id="app">
+  <header>
+    <span class="brand">🏢 후니네 팀</span>
+    <input id="topic" placeholder="회의 주제 — 예: bge-m3 한국어 검색 정확도 올리기">
+    <label title="각 동료가 몇 바퀴 발언할지 — 길수록 깊게 논의하지만 오래 걸려요">회의 길이
+      <select id="rounds">
+        <option value="1">짧게 (1바퀴)</option>
+        <option value="2" selected>보통 (2바퀴)</option>
+        <option value="3">깊게 (3바퀴)</option>
+      </select>
+    </label>
+    <button id="summon">회의 소집</button>
+    <button id="endmtg" class="ghost" hidden>회의 종료</button>
+    <span id="status"></span>
+  </header>
+
+  <main>
+    <div id="stage">
+      <canvas id="floor" width="896" height="576"></canvas>
+    </div>
+
+    <aside id="side">
+      <section id="chatbox">
+        <div class="panel-head">
+          <span>팀 채팅</span>
+          <button id="clearchat" class="mini">지우기</button>
+        </div>
+        <div id="chat"></div>
+      </section>
+
+      <section id="boardbox">
+        <div class="panel-head">
+          <span>업무 보드</span>
+          <span class="hint">💡 동료 제안 코드는 카드에만 — 파일엔 아직 반영 안 됨</span>
+        </div>
+        <div id="board"></div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="modal" hidden>
+    <div class="sheet">
+      <div class="sheet-head">
+        <span>📋 회의 결과</span>
+        <button id="modalClose" class="mini">닫기</button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+</div>
+
+<script src="office.js"></script>
+<script src="chat.js"></script>
+<script src="board.js"></script>
+<script src="main.js"></script>
