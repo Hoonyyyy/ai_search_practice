@@ -50,22 +50,15 @@ rag_search/
 
 ## 로컬 실행 방법
 
-### 사전 준비 (최초 1회)
+### 사전 준비 (최초 1회, 새 PC 포함)
 
 ```powershell
-# 1. Ollama 설치 후 모델 받기
-ollama pull llama3.2:3b
-ollama pull nomic-embed-text
-
-# 2. Python AI 서비스 의존성
-cd backend-ai
-python -m venv venv
-.\venv\Scripts\pip install -r requirements.txt
-
-# 3. 프론트엔드 의존성
-cd ..\frontend
-npm install
+.\setup.ps1
 ```
+
+Ollama 설치 확인, 필요 모델(`bge-m3`, `qwen2.5:3b`) pull, `backend-ai\venv` 생성 +
+`requirements.txt` 설치, `frontend\node_modules` 설치, `backend-ai\.env` 생성까지
+한 번에 처리한다. 이미 되어 있는 항목은 건너뛰므로 재실행해도 안전.
 
 ### 실행
 

@@ -2,6 +2,23 @@
 
 ---
 
+## v4.3 — 새 PC 환경 세팅 자동화
+
+### 배경
+- 노트북 외에 GPU(GTX 1660 Super) 있는 데스크탑에서도 동일하게 작업하고 싶은데,
+  Ollama 모델 재설치·venv·npm install·.env 를 손으로 하면 오래 걸리고 누락되기 쉬움
+- `CLAUDE.md`/`start_search.ps1`의 "사전 준비" 안내가 예전 모델명(`llama3.2:3b`,
+  `nomic-embed-text`)을 그대로 가리키고 있어 실제 기본값(`qwen2.5:3b`, `bge-m3`)과 어긋나 있었음
+
+### 변경 사항
+- `setup.ps1` 신규: python/node/mvn/java/ollama PATH 확인 → Ollama 모델
+  (`bge-m3`, `qwen2.5:3b`) pull → `backend-ai\venv` + requirements 설치 →
+  `frontend\node_modules` 설치 → `backend-ai\.env` 생성까지 한 번에. 이미 되어있는
+  항목은 스킵하므로 재실행해도 안전
+- `CLAUDE.md`, `start_search.ps1`의 사전 준비 안내를 `setup.ps1` 실행 + 현재 모델명으로 수정
+
+---
+
 ## v4.2 — 회귀 테스트 인프라 구축 (진행 중)
 
 ### 배경
