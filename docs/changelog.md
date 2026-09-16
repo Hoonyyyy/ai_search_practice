@@ -2,6 +2,32 @@
 
 ---
 
+## v4.2 — 회귀 테스트 인프라 구축 (진행 중)
+
+### 배경
+- v4.0~v4.1의 RAG 품질 수정들이 회귀 테스트 없이 이루어져, 앞으로 리팩토링하다가
+  같은 버그가 재발해도 잡을 안전망이 없었음
+- 후니가 테스트 작성을 직접 익히고 싶어함 — 체크리스트만 주는 방식은 안 통해서
+  작은 실행 가능한 토이 예제로 monkeypatch 등 개념을 먼저 보여주는 방식으로 진행
+
+### 변경 사항
+- `pytest` 설치 및 `requirements.txt` 반영
+- `backend-ai/tests/` 신설, 5단계 난이도별 테스트 사다리로 진행:
+  1. `test_config.py` — `settings.embed_model/embed_dim/full_context_threshold` 기본값 회귀 (완료)
+  2. `test_pure_functions.py` — `llm_service._build_prompt`/`._messages`,
+     `vector_repository._to_dict` 순수 함수 (완료)
+  3. `vector_repository._embed` prefix 로직, `requests.post` monkeypatch (진행 중)
+  4. `similarity_search` threshold 분기, fake Qdrant client (예정)
+  5. `stream_response` 에러 경로 (예정)
+- 실행: `./venv/Scripts/python.exe -m pytest tests/ -v` (bare `pytest`는 `backend-ai`가
+  `sys.path`에 없어 `from config import settings` 실패)
+
+**함께 수정 (별개 이슈):** `start_search.ps1`/`stop_search.ps1`/`office/run.ps1`/`office/stop.ps1`에
+UTF-8 BOM 누락 — Windows PowerShell 5.1이 한글을 MS949로 읽어 문자열 종료가 깨지면서
+스크립트가 실행되지 않던 문제, BOM 추가로 수정.
+
+---
+
 ## v4.0 — 완전 로컬 스택 전환
 
 ### 배경
