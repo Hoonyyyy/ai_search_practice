@@ -1,4 +1,4 @@
-# AI Search 전체 서비스 종료 (Windows / PowerShell)
+﻿# AI Search 전체 서비스 종료 (Windows / PowerShell)
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pidFile = Join-Path $root ".ai_search_pids.json"
 

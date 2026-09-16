@@ -1,4 +1,4 @@
-# AI Search 전체 서비스 시작 (Windows / PowerShell)
+﻿# AI Search 전체 서비스 시작 (Windows / PowerShell)
 #   실행: powershell -ExecutionPolicy Bypass -File .\start_search.ps1
 # 사전 조건:
 #   - Ollama 실행 중 + `ollama pull llama3.2:3b`, `ollama pull nomic-embed-text`

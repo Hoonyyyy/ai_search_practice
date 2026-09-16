@@ -1,4 +1,4 @@
-# office 서버(8899 등) 종료.
+﻿# office 서버(8899 등) 종료.
 $port = "8899"
 if (Test-Path "$PSScriptRoot\.env") {
     $m = Select-String -Path "$PSScriptRoot\.env" -Pattern '^OFFICE_PORT=(\d+)'

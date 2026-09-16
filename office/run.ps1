@@ -1,4 +1,4 @@
-# office 사무실만 띄운다. 기존 rag_search 서비스(8080/8001/3000)와 무관.
+﻿# office 사무실만 띄운다. 기존 rag_search 서비스(8080/8001/3000)와 무관.
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
