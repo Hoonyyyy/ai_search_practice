@@ -21,6 +21,18 @@
       "request": "launch",
       "url": "http://localhost:3000",
       "webRoot": "${workspaceFolder}/frontend/src"
+    },
+    {
+      // Spring Boot 디버그. 브레이크포인트: DocumentService.java
+      "name": "Spring Boot",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "com.ragsearch.RagSearchApplication",
+      "projectName": "rag-search",
+      "cwd": "${workspaceFolder}/backend-spring",
+      "vmArgs": "-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8",
+      "console": "integratedTerminal"
     }
+
   ]
 }

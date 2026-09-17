@@ -2,6 +2,41 @@
 
 ---
 
+## v4.4 — 개발용 요청 로깅 + VS Code 디버그 환경
+
+### 배경
+- 계층이 4개(React → Spring → FastAPI → Ollama)인데 **Spring 계층만 요청 로그가 없어서**,
+  요청이 어디까지 갔는지 확인할 방법이 없었음. FastAPI 는 uvicorn access log 가 있고,
+  React 는 브라우저 Network 탭이 있는데 가운데만 깜깜했음
+- SSE 스트리밍 중 브라우저가 "생성중"에서 멈추는 현상을 디버깅할 때, Spring 로그를
+  직접 뒤져서야 원인(`IllegalStateException: response object has been recycled`)을 찾을 수 있었음
+- 앞으로 검색·임베딩 속도를 개선하려면 **"얼마나 걸리는지" 측정 수단이 먼저** 필요
+
+### 변경 사항
+- `config/RequestLoggingFilter` 신규 (`OncePerRequestFilter`):
+  `METHOD /path -> status (Xms)` 형태로 모든 요청 로깅. `try/finally` 로 실패한 요청도 남김
+- `application.yml` 에 `logging.file.name: logs/spring.log` 추가 — 콘솔 설정
+  (integratedTerminal / internalConsole)에 좌우되지 않고 **항상 파일로** 남도록.
+  실시간 확인: `Get-Content backend-spring\logs\spring.log -Wait -Tail 5`
+- `.vscode/launch.json` 에 "Spring Boot" 자바 디버그 설정 추가.
+  `vmArgs` 에 `-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8` 필수 (없으면 한글 깨짐)
+
+### 알아낸 것
+- **SSE 엔드포인트의 시간은 이 필터로 못 잰다.** `upload()` 가 `SseEmitter` 를 반환하는 순간
+  요청이 비동기로 전환되어 원래 스레드가 즉시 반환되므로, 업로드가 `63ms` 로 찍힌다.
+  실제 작업(추출→청킹→임베딩)은 그 뒤 `sseExecutor` 스레드에서 진행됨.
+  `request.isAsyncStarted()` 로 `[async]` 표시를 붙여 이 숫자를 믿지 않도록 표시함.
+  **진짜 소요 시간 측정은 별도 과제** (서비스 내부 측정 또는 `AsyncListener`)
+- 로그 메시지는 **ASCII 로** 작성할 것. Java 가 UTF-8 로 쓰는데 Windows 터미널이 CP949 로
+  읽으면 한글이 깨진다. 배포 환경(Docker/클라우드 로그 뷰어)까지 고려하면 ASCII 가 안전
+- PDF 추출 품질: 디버거로 `DocumentService.extractText()` 결과를 직접 확인한 결과,
+  `setSortByPosition(true)` 는 다단 레이아웃 문서(삼성 노트북 설명서, 47,611자)에서
+  **단을 가로질러 읽어 문장을 쪼갠다** ("데이터를 백업해" + 다른 단 내용 + "두세요.").
+  `false` 로 두면 순서가 보존됨. 다만 주석에 적힌 "이력서·양식 문서엔 `true` 가 낫다"는
+  주장은 아직 검증 전이라 `true` 유지 — **이력서 PDF 로 같은 실험을 하는 것이 남은 과제**
+
+---
+
 ## v4.3 — 새 PC 환경 세팅 자동화
 
 ### 배경
