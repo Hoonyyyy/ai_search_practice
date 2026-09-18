@@ -37,4 +37,18 @@ public class DocumentController {
         documentService.deleteDocument(docId);
         return ResponseEntity.ok(Map.of("message", "삭제 완료"));
     }
+
+    /** 잔여 벡터 조회 - 삭제하지 않고 보기만 한다 */
+    @GetMapping("/leftovers")
+    public Map<String, Object> leftovers() {
+        List<String> docIds = documentService.findLeftoverDocIds();
+        return Map.of("count", docIds.size(), "doc_ids", docIds);
+    }
+
+    /** 잔여 벡터 정리 - 되돌릴 수 없으므로 명시적 요청으로만 실행. */
+    @PostMapping("/cleanup")
+    public ResponseEntity<Map<String, Object>> cleanupLeftovers() {
+        int deleted = documentService.cleanupLeftovers();
+        return ResponseEntity.ok(Map.of("deleted", deleted));
+    }
 }

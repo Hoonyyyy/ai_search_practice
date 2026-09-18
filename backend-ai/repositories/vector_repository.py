@@ -159,3 +159,22 @@ def delete_document(doc_id: str) -> None:
             must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
         ),
     )
+
+
+def list_doc_ids() -> List[str]:
+    """Qdrant에 실제로 저장돼 있는 doc_id 목록(중복 제거)."""
+    client = _get_client()
+    ids = set()
+    offset = None
+    while True:
+        points, offset = client.scroll(
+            collection_name=COLLECTION,
+            limit=256,
+            with_payload=["doc_id"],
+            with_vectors=False,
+            offset=offset,
+        )
+        ids.update(p.payload["doc_id"] for p in points)
+        if offset is None:
+            break
+    return sorted(ids)

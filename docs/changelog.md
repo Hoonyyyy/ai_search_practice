@@ -2,6 +2,46 @@
 
 ---
 
+## v4.6 — 잔여 벡터(정합성 깨짐) 예방·감지·회복
+
+### 배경
+- `DocumentService.upload()` 은 **벡터를 먼저 저장하고(`embedAndStore`) 문서 메타데이터를 나중에 저장**(`documentRepository.save`)했다.
+  그 사이에서 예외가 나거나 프로세스가 죽으면 **Qdrant에는 벡터가 있는데 H2에는 문서가 없는** 상태가 남는다.
+- `similarity_search` 는 컬렉션 전체를 대상으로 하므로, 주인 없는 벡터도 검색 결과와 LLM 컨텍스트에 섞여 들어간다.
+  청크 수가 `full_context_threshold` 이하면 `scroll` 로 **전부** LLM에 전달되므로 영향이 더 크다.
+- 실측: Qdrant `doc_id` 2건 vs H2 문서 0건. 화면 목록은 비어 있는데 검색은 답을 내놓는 상태였다.
+
+### 변경 사항
+
+**예방 — 보상 트랜잭션**
+- `DocumentService.upload()` 의 `embedAndStore` 를 `try/catch` 로 감싸고, 실패 시 `cleanupLeftoverVectors(docId)` 로 방금 저장한 벡터를 삭제한 뒤 원래 예외를 그대로 재던진다(`throw e`).
+- 정리 자체가 실패해도 원래 예외를 덮지 않도록 헬퍼 내부에서 다시 `try/catch` 하고 로그만 남긴다.
+
+**감지 — 시작 시 정합성 점검**
+- `@EventListener(ApplicationReadyEvent.class) checkLeftoversOnStartup()` — 앱이 완전히 뜬 뒤 Qdrant/H2 차집합을 계산해 **경고만** 남긴다. 자동 삭제는 하지 않는다.
+- AI 서비스가 아직 안 떠 있어도 스프링 기동을 막지 않도록 전체를 `try/catch` 로 감쌌다.
+
+**회복 — 명시적 정리 API**
+- `GET  /api/documents/leftovers` — 삭제 없이 조회만
+- `POST /api/documents/cleanup` — 실제 삭제, 삭제 건수 반환
+- 삭제는 되돌릴 수 없으므로 **감지와 실행을 분리**했다.
+
+**Backend (AI)**
+- `vector_repository.list_doc_ids()` — `scroll` 페이지네이션으로 전체를 훑어 중복 제거된 `doc_id` 목록 반환. `with_vectors=False` 로 1024차원 벡터는 받지 않는다.
+- `GET /ai/documents/doc-ids` 라우터 추가 (변수 경로 `/{doc_id}` 보다 위에 배치)
+
+### 검증
+- **결함 주입(fault injection)**: `embedAndStore` 직후에 임시로 `RuntimeException` 을 던져 실패 경로를 강제 실행.
+  로그에서 `잔여 벡터 정리 완료` → `업로드 처리 실패` 순서를 확인해 **정리 후 원래 예외가 살아서 전파되는 것**까지 증명했다. 확인 후 주입 코드는 제거.
+- 실제 잔여 벡터 2건을 감지 → 조회 → 정리 → 재조회(`count: 0`)까지 전 과정 로그로 확인.
+
+### 배운 것
+- `h2:file:` 인 것을 먼저 확인했다. `h2:mem:` 이었다면 재시작마다 H2가 비므로 "H2에 없는 벡터를 지운다"는 로직이 **Qdrant를 통째로 삭제**했을 것이다. 삭제 로직은 판단 기준이 되는 데이터가 비어 있을 수 있는지를 먼저 의심해야 한다.
+- 실행 중인 JVM은 시작 시점의 클래스를 들고 있다. 소스를 고쳐도 **재시작 전까지 반영되지 않는다**.
+- 서비스 간 경로는 문자열이라 컴파일러가 검사해주지 않는다(`/docids` 오타 → 404). 마이크로서비스의 구조적 비용.
+
+---
+
 ## v4.5 — 단계별 소요 시간 계측 + 청킹 버그 수정 (backend-spring 첫 테스트)
 
 ### 배경
