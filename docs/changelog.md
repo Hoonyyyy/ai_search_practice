@@ -2,6 +2,102 @@
 
 ---
 
+## v4.5 — 단계별 소요 시간 계측 + 청킹 버그 수정 (backend-spring 첫 테스트)
+
+### 배경
+- v4.4 의 요청 로깅으로 "업로드가 느리다"는 건 알았지만 **어느 단계가** 느린지는 몰랐음.
+  SSE 때문에 필터가 재는 시간(40~63ms)이 실제 소요 시간(11~17초)과 무관했기 때문
+- 감으로 최적화하면 전체의 3% 짜리(PDF 추출)를 붙잡을 위험이 있었음
+
+### 변경 사항
+- `DocumentService.upload()` 에 단계별 계측: `extract / split / embed / total`
+- `vector_repository.add_chunks_stream()` 에 `embed / upsert` 분리 계측
+- `splitText` 를 `static` + 파라미터(`chunkSize`, `chunkOverlap`) 방식으로 변경 —
+  필드 의존을 없애 **순수 함수**로 만들어 단위 테스트가 가능해짐
+- **버그 수정**: 청크 사이 겹침(overlap)을 이어붙일 때 `chunkSize` 초과 여부를 검사하지 않아,
+  긴 줄이 들어오면 청크가 `chunkSize + chunkOverlap + 1` 까지 커졌음
+  (700 설정에서 **751자** 관측). 겹침을 붙여도 한도를 넘지 않을 때만 붙이도록 수정 —
+  문장을 중간에서 자르는 대신 겹침을 포기하는 쪽을 택함
+- `src/test/java/com/ragsearch/service/DocumentServiceSplitTextTest` 신규 —
+  **backend-spring 최초의 테스트**. 실행: `cd backend-spring; mvn test`
+
+### 측정 결과 (9청크 PDF 업로드)
+```
+Java   : extract 135ms, split 6ms, embed 11144ms, total 11285ms
+Python : embed 11053ms, upsert 52ms, total 11107ms
+```
+- **임베딩이 전체의 97.9%.** Qdrant 저장 52ms(0.5%), Spring↔FastAPI 통신 37ms
+- `bge-m3` 가 100% CPU 로 도는 환경(GPU 없음)이라 소프트웨어 최적화 여지가 거의 없음 →
+  실질적 선택지는 **GPU 데스크탑** 또는 **클라우드 임베딩 API**(배포 시 어차피 필요)
+- 벤치마크 교훈: 처음엔 `"가".repeat(500)` 으로 측정했는데 반복 문자는 토큰이 훨씬 적게 나와
+  실제보다 빠르게 측정됨. **실제 데이터로 재야 한다**
+
+### 정정 — "청크가 설정값의 2배" 는 코드 버그가 아니라 **측정 오류**였음
+조사 중 "Qdrant 에 저장된 청크가 평균 1,362자(최대 1,663자)" 로 관측되어 `splitText` 의
+이론적 상한(801자)을 넘는 것처럼 보였으나, **검증 결과 저장된 청크는 최대 699자로 정상**이었다.
+
+원인은 코드가 아니라 조회에 쓴 도구였다. PowerShell 5.1 의 `Invoke-WebRequest` 가 UTF-8
+응답을 Latin-1 로 디코딩하면서 **한글 1자(UTF-8 3바이트)가 깨진 글자 3개로 늘어나** 문자열
+길이가 ~2.5배로 부풀었다.
+
+```
+Java 로그            : 80 chunks, textLen 47611, longest 699
+PowerShell 기본 디코딩 : 최대 1663, 평균 1499   ← 부풀려진 값
+UTF-8 강제 디코딩      : 최대  699, 평균  670   ← Java 와 일치
+```
+
+- 올바른 조회 방법: `[System.Text.Encoding]::UTF8.GetString($resp.RawContentStream.ToArray())`
+- **교훈**: "저장된 청크의 최소값(739)이 생성된 청크의 최대값(699)보다 크다"는 논리적으로
+  불가능한 값이었다. 이런 값이 나오면 **코드보다 계측을 먼저 의심**해야 한다.
+  같은 응답의 파일명이 `ì¬ëì¸_...` 로 깨져 있었던 것이 이미 단서였다
+- 이 프로젝트에서 인코딩 문제는 네 번째다 (PowerShell BOM, 자바 로그 CP949,
+  `PYTHONUTF8`, 그리고 이번 조회 디코딩) — 한글 프로젝트의 고질적 함정
+- 참고: 위의 **겹침(overlap) 버그(751자)는 실재한다.** 그건 PowerShell 이 아니라
+  JUnit 테스트로 JVM 안에서 직접 측정해 인코딩 계층이 개입하지 않았다
+
+### 남은 과제
+- **고아 벡터**: `embedAndStore`(벡터 저장) 이후 `documentRepository.save`(문서 등록) 전에
+  업로드가 끊기면 벡터만 남고 문서 기록이 없어짐. 관측 시점 기준 Qdrant 73청크 vs H2 1문서
+  (이 수치는 개수 집계라 인코딩 문제와 무관하며 유효함).
+  `similarity_search` 는 컬렉션 전체를 뒤지므로 **삭제된 문서가 답변 근거로 계속 쓰임**
+
+---
+
+## v4.4 — 개발용 요청 로깅 + VS Code 디버그 환경
+
+### 배경
+- 계층이 4개(React → Spring → FastAPI → Ollama)인데 **Spring 계층만 요청 로그가 없어서**,
+  요청이 어디까지 갔는지 확인할 방법이 없었음. FastAPI 는 uvicorn access log 가 있고,
+  React 는 브라우저 Network 탭이 있는데 가운데만 깜깜했음
+- SSE 스트리밍 중 브라우저가 "생성중"에서 멈추는 현상을 디버깅할 때, Spring 로그를
+  직접 뒤져서야 원인(`IllegalStateException: response object has been recycled`)을 찾을 수 있었음
+- 앞으로 검색·임베딩 속도를 개선하려면 **"얼마나 걸리는지" 측정 수단이 먼저** 필요
+
+### 변경 사항
+- `config/RequestLoggingFilter` 신규 (`OncePerRequestFilter`):
+  `METHOD /path -> status (Xms)` 형태로 모든 요청 로깅. `try/finally` 로 실패한 요청도 남김
+- `application.yml` 에 `logging.file.name: logs/spring.log` 추가 — 콘솔 설정
+  (integratedTerminal / internalConsole)에 좌우되지 않고 **항상 파일로** 남도록.
+  실시간 확인: `Get-Content backend-spring\logs\spring.log -Wait -Tail 5`
+- `.vscode/launch.json` 에 "Spring Boot" 자바 디버그 설정 추가.
+  `vmArgs` 에 `-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8` 필수 (없으면 한글 깨짐)
+
+### 알아낸 것
+- **SSE 엔드포인트의 시간은 이 필터로 못 잰다.** `upload()` 가 `SseEmitter` 를 반환하는 순간
+  요청이 비동기로 전환되어 원래 스레드가 즉시 반환되므로, 업로드가 `63ms` 로 찍힌다.
+  실제 작업(추출→청킹→임베딩)은 그 뒤 `sseExecutor` 스레드에서 진행됨.
+  `request.isAsyncStarted()` 로 `[async]` 표시를 붙여 이 숫자를 믿지 않도록 표시함.
+  **진짜 소요 시간 측정은 별도 과제** (서비스 내부 측정 또는 `AsyncListener`)
+- 로그 메시지는 **ASCII 로** 작성할 것. Java 가 UTF-8 로 쓰는데 Windows 터미널이 CP949 로
+  읽으면 한글이 깨진다. 배포 환경(Docker/클라우드 로그 뷰어)까지 고려하면 ASCII 가 안전
+- PDF 추출 품질: 디버거로 `DocumentService.extractText()` 결과를 직접 확인한 결과,
+  `setSortByPosition(true)` 는 다단 레이아웃 문서(삼성 노트북 설명서, 47,611자)에서
+  **단을 가로질러 읽어 문장을 쪼갠다** ("데이터를 백업해" + 다른 단 내용 + "두세요.").
+  `false` 로 두면 순서가 보존됨. 다만 주석에 적힌 "이력서·양식 문서엔 `true` 가 낫다"는
+  주장은 아직 검증 전이라 `true` 유지 — **이력서 PDF 로 같은 실험을 하는 것이 남은 과제**
+
+---
+
 ## v4.3 — 새 PC 환경 세팅 자동화
 
 ### 배경

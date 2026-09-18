@@ -38,5 +38,7 @@ document:
   allowed-extensions: .pdf,.txt,.md
 
 logging:
+  file:
+    name: logs/spring.log
   level:
     com.ragsearch: DEBUG

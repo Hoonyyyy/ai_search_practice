@@ -6,6 +6,7 @@
 from pathlib import Path
 from typing import List, Dict, Any, Generator, Optional
 import uuid
+import time
 
 import requests
 from qdrant_client import QdrantClient
@@ -82,10 +83,18 @@ def add_chunks_stream(doc_id: str, filename: str, chunks: List[str]) -> Generato
     total = len(chunks)
     batch_size = 16
 
+    t_embed_total = 0.0
+    t_upsert_total = 0.0
+    t_start = time.time()
+
     for i in range(0, total, batch_size):
         end = min(i + batch_size, total)
         batch = chunks[i:end]
+
+        t0 = time.time()
         vectors = _embed(batch)
+        t_embed_total += time.time() - t0
+
         points = [
             PointStruct(
                 id=str(uuid.uuid4()),
@@ -99,8 +108,16 @@ def add_chunks_stream(doc_id: str, filename: str, chunks: List[str]) -> Generato
             )
             for j in range(len(batch))
         ]
+
+        t1 = time.time()
         client.upsert(collection_name=COLLECTION, points=points)
+        t_upsert_total += time.time() - t1
+
         yield end, total
+
+    print(f"[timing] embed {t_embed_total*1000:.0f}ms, "
+          f"upsert {t_upsert_total*1000:.0f}ms, "
+          f"total {(time.time()-t_start)*1000:.0f}ms ({total} chunks)", flush=True)
 
 
 def _to_dict(payload: Dict[str, Any], score: float) -> Dict[str, Any]:
