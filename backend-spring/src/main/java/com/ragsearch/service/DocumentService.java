@@ -104,12 +104,15 @@ public class DocumentService {
                         .build();
                 documentRepository.save(document);
 
-                log.info("upload timing -> extract {}ms,  split {}ms, embed {}ms, total {}ms ({} chunks)",
+                log.info("upload timing -> extract {}ms,  split {}ms, embed {}ms, total {}ms ({} chunks, textLen {}, longest {})",
                         tExtract - t0,
                         tSplit - tExtract,
                         tEmbed - tSplit,
                         tEmbed - t0,
-                        chunks.size());
+                        chunks.size(),
+                        text.length(),
+                        chunks.stream().mapToInt(String::length).max().orElse(0)
+                    );
 
 
                 // 5. 완료 이벤트
