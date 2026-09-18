@@ -47,12 +47,17 @@ public class DocumentService {
         SseEmitter emitter = new SseEmitter(300_000L);
 
         sseExecutor.execute(() -> {
+
+            long t0 = System.currentTimeMillis();
+
             try {
                 validateExtension(file.getOriginalFilename());
 
                 // 1. 텍스트 추출
                 sendEvent(emitter, Map.of("stage", "extracting", "message", "텍스트 추출 중..."));
                 String text = extractText(file);
+
+                long tExtract = System.currentTimeMillis();
 
                 if (text.isBlank()) {
                     sendEvent(emitter, Map.of("stage", "error", "message", "텍스트를 추출할 수 없습니다."));
@@ -61,7 +66,10 @@ public class DocumentService {
                 }
 
                 // 2. 청크 분할
-                List<String> chunks = splitText(text);
+                List<String> chunks = splitText(text, chunkSize, chunkOverlap);
+
+                long tSplit = System.currentTimeMillis();
+
                 sendEvent(emitter, Map.of(
                         "stage", "splitting",
                         "message", String.format("청크 분할 완료 (%d개)", chunks.size()),
@@ -85,6 +93,8 @@ public class DocumentService {
                     heartbeatExecutor.shutdownNow();
                 }
 
+                long tEmbed = System.currentTimeMillis();
+
                 // 4. 문서 메타데이터 JPA 저장
                 Document document = Document.builder()
                         .docId(docId)
@@ -93,6 +103,14 @@ public class DocumentService {
                         .uploadedAt(LocalDateTime.now())
                         .build();
                 documentRepository.save(document);
+
+                log.info("upload timing -> extract {}ms,  split {}ms, embed {}ms, total {}ms ({} chunks)",
+                        tExtract - t0,
+                        tSplit - tExtract,
+                        tEmbed - tSplit,
+                        tEmbed - t0,
+                        chunks.size());
+
 
                 // 5. 완료 이벤트
                 sendEvent(emitter, Map.of(
@@ -160,7 +178,7 @@ public class DocumentService {
      * 2) 한 줄이 chunkSize 보다 길면 그 줄만 문자 단위로 강제 분할한다.
      * 3) 청크 사이에 chunkOverlap 문자를 겹쳐 문맥 단절을 줄인다.
      */
-    private List<String> splitText(String text) {
+    static List<String> splitText(String text, int chunkSize, int chunkOverlap) {
         String normalized = text.replace("\r\n", "\n").replace('\r', '\n');
         List<String> chunks = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
@@ -181,7 +199,7 @@ public class DocumentService {
                 chunks.add(cur.toString());
                 String prev = cur.toString();
                 cur.setLength(0);
-                if (chunkOverlap > 0 && prev.length() > chunkOverlap) {
+                if (chunkOverlap > 0 && prev.length() > chunkOverlap && chunkOverlap + line.length() + 1 <= chunkSize) {
                     cur.append(prev, prev.length() - chunkOverlap, prev.length()).append('\n');
                 }
             }

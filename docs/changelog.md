@@ -2,6 +2,45 @@
 
 ---
 
+## v4.5 — 단계별 소요 시간 계측 + 청킹 버그 수정 (backend-spring 첫 테스트)
+
+### 배경
+- v4.4 의 요청 로깅으로 "업로드가 느리다"는 건 알았지만 **어느 단계가** 느린지는 몰랐음.
+  SSE 때문에 필터가 재는 시간(40~63ms)이 실제 소요 시간(11~17초)과 무관했기 때문
+- 감으로 최적화하면 전체의 3% 짜리(PDF 추출)를 붙잡을 위험이 있었음
+
+### 변경 사항
+- `DocumentService.upload()` 에 단계별 계측: `extract / split / embed / total`
+- `vector_repository.add_chunks_stream()` 에 `embed / upsert` 분리 계측
+- `splitText` 를 `static` + 파라미터(`chunkSize`, `chunkOverlap`) 방식으로 변경 —
+  필드 의존을 없애 **순수 함수**로 만들어 단위 테스트가 가능해짐
+- **버그 수정**: 청크 사이 겹침(overlap)을 이어붙일 때 `chunkSize` 초과 여부를 검사하지 않아,
+  긴 줄이 들어오면 청크가 `chunkSize + chunkOverlap + 1` 까지 커졌음
+  (700 설정에서 **751자** 관측). 겹침을 붙여도 한도를 넘지 않을 때만 붙이도록 수정 —
+  문장을 중간에서 자르는 대신 겹침을 포기하는 쪽을 택함
+- `src/test/java/com/ragsearch/service/DocumentServiceSplitTextTest` 신규 —
+  **backend-spring 최초의 테스트**. 실행: `cd backend-spring; mvn test`
+
+### 측정 결과 (9청크 PDF 업로드)
+```
+Java   : extract 135ms, split 6ms, embed 11144ms, total 11285ms
+Python : embed 11053ms, upsert 52ms, total 11107ms
+```
+- **임베딩이 전체의 97.9%.** Qdrant 저장 52ms(0.5%), Spring↔FastAPI 통신 37ms
+- `bge-m3` 가 100% CPU 로 도는 환경(GPU 없음)이라 소프트웨어 최적화 여지가 거의 없음 →
+  실질적 선택지는 **GPU 데스크탑** 또는 **클라우드 임베딩 API**(배포 시 어차피 필요)
+- 벤치마크 교훈: 처음엔 `"가".repeat(500)` 으로 측정했는데 반복 문자는 토큰이 훨씬 적게 나와
+  실제보다 빠르게 측정됨. **실제 데이터로 재야 한다**
+
+### 남은 과제
+- Qdrant 에 저장된 청크가 평균 1,362자(최대 1,663자)로 관측됐는데, 이는 `splitText` 의
+  이론적 상한(801자)을 넘음 — **원인 미규명**. 이번 수정 후 실제 업로드로 재확인 필요
+- **고아 벡터**: `embedAndStore`(벡터 저장) 이후 `documentRepository.save`(문서 등록) 전에
+  업로드가 끊기면 벡터만 남고 문서 기록이 없어짐. 관측 시점 기준 Qdrant 73청크 vs H2 1문서.
+  `similarity_search` 는 컬렉션 전체를 뒤지므로 **삭제된 문서가 답변 근거로 계속 쓰임**
+
+---
+
 ## v4.4 — 개발용 요청 로깅 + VS Code 디버그 환경
 
 ### 배경
