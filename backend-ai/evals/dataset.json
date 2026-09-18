@@ -1,0 +1,52 @@
+[
+  {
+    "question": "화면을 밝게 하려면 어떤 키를 눌러야 하나요?",
+    "expect": "F3",
+    "doc": "Galaxybook_guide.pdf"
+  },
+  {
+    "question": "지문을 등록하려면 어떻게 하나요?",
+    "expect": "Windows Hello",
+    "doc": "Galaxybook_guide.pdf"
+  },
+  {
+    "question": "퀵 서치를 실행하는 단축키가 뭔가요?",
+    "expect": "F12",
+    "doc": "Galaxybook_guide.pdf"
+  },
+  {
+    "question": "배터리를 직접 교체할 수 있나요?",
+    "expect": "서비스 센터",
+    "doc": "Galaxybook_guide.pdf"
+  },
+  {
+    "question": "PC를 초기화하는 방법을 알려주세요",
+    "expect": "Samsung Recovery",
+    "doc": "Galaxybook_guide.pdf"
+  },
+  {
+    "question": "배터리 캘리브레이션은 어떻게 하나요?",
+    "expect": "BIOS",
+    "doc": "Galaxybook_guide.pdf"
+  },
+  {
+    "question": "어느 학교를 나왔나요?",
+    "expect": "한경대학교",
+    "doc": "사람인_이력서_강현수.pdf"
+  },
+  {
+    "question": "어느 회사에서 일했나요?",
+    "expect": "와이즈넛",
+    "doc": "사람인_이력서_강현수.pdf"
+  },
+  {
+    "question": "다룰 줄 아는 기술이 뭔가요?",
+    "expect": "MyBatis",
+    "doc": "사람인_이력서_강현수.pdf"
+  },
+  {
+    "question": "자격증은 어떤 걸 가지고 있나요?",
+    "expect": "산림기사",
+    "doc": "사람인_이력서_강현수.pdf"
+  }
+]
