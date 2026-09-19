@@ -6,6 +6,22 @@ React → Spring Boot → Python FastAPI → Ollama / Qdrant 로 이어지는 �
 
 ---
 
+![문서 검색 화면](docs/images/search-demo.png)
+
+질문하면 관련 청크를 찾아 LLM이 답하고, **근거가 된 문서 조각과 응답시간·토큰 수를 함께** 보여줍니다. 답변은 SSE로 스트리밍됩니다.
+
+<details>
+<summary>성능 대시보드 (펼치기)</summary>
+
+![성능 대시보드](docs/images/dashboard.png)
+
+쿼리별 응답시간·토큰 사용량을 기록해 추이를 봅니다.
+화면의 평균 응답시간은 IPv6 문제를 고치기 전 기록까지 포함한 누적값입니다.
+
+</details>
+
+---
+
 ## 이 프로젝트에서 봐주셨으면 하는 것
 
 기능을 나열하기보다, **문제를 어떻게 찾아내고 무엇을 근거로 결정했는지**를 남기려 했습니다.
