@@ -133,8 +133,20 @@ def _to_dict(payload: Dict[str, Any], score: float) -> Dict[str, Any]:
 
 
 def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
+
+    t_start = time.time()
+
+    t0 = time.time()
+
     client = _get_client()
+
+    t_client = time.time() - t0
+
+    t0 = time.time()
+
     total = client.count(collection_name=COLLECTION).count
+
+    t_count = time.time() - t0
 
     # 청크가 얼마 없으면 검색 자체가 손해 — 전부 넣고 순서만 정렬한다.
     if 0 < total <= settings.full_context_threshold:
@@ -142,13 +154,34 @@ def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
         pts.sort(key=lambda p: (p.payload["doc_id"], p.payload["chunk_index"]))
         return [_to_dict(p.payload, 1.0) for p in pts]
 
+    t0 = time.time()
+
     query_vec = _embed([query], task="search_query")[0]
+
+    t_embed = time.time() - t0
+
+    t0 = time.time()
+
     result = client.query_points(
         collection_name=COLLECTION,
         query=query_vec,
         limit=top_k,
         with_payload=True,
     )
+
+    t_query = time.time() - t0
+
+    print(f"[search timing] client {t_client*1000:.0f}ms, "
+          f"count {t_count*1000:.0f}ms, embed {t_embed*1000:.0f}ms, query {t_query*1000:.0f}ms, "
+          f"total {(time.time()-t_start)*1000:.0f}ms (총 {total}개 청크)", flush=True)
+
+    if 0 < total <= settings.full_context_threshold:
+        pts, _ = client.scroll(...)
+        pts.sort(...)
+        print(f"[search timing] 전체 컨텍스트 모드 - {total}개 전부 반환", flush=True)
+        return [_to_dict(p.payload, 1.0) for p in pts]
+
+
     return [_to_dict(h.payload, h.score) for h in result.points]
 
 
@@ -159,3 +192,22 @@ def delete_document(doc_id: str) -> None:
             must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
         ),
     )
+
+
+def list_doc_ids() -> List[str]:
+    """Qdrant에 실제로 저장돼 있는 doc_id 목록(중복 제거)."""
+    client = _get_client()
+    ids = set()
+    offset = None
+    while True:
+        points, offset = client.scroll(
+            collection_name=COLLECTION,
+            limit=256,
+            with_payload=["doc_id"],
+            with_vectors=False,
+            offset=offset,
+        )
+        ids.update(p.payload["doc_id"] for p in points)
+        if offset is None:
+            break
+    return sorted(ids)

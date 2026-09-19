@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).parent
 
 class Settings(BaseSettings):
     # ── 임베딩 (항상 Ollama) ──────────────────────────────────
-    ollama_base_url: str = "http://localhost:11434"
+    ollama_base_url: str = "http://127.0.0.1:11434"
     embed_model: str = "bge-m3"            # 다국어 임베딩. nomic-embed-text 는 한국어에서 사실상 무작위
     embed_dim: int = 1024                  # bge-m3 출력 차원
     ollama_keep_alive: str = "10m"         # 세션 중 모델 재로딩(cold start) 방지. RAM 빠듯하면 "5m"

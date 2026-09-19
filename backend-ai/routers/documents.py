@@ -33,6 +33,11 @@ def embed_and_store(req: EmbedAndStoreRequest):
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+@router.get("/doc-ids")
+def list_doc_ids():
+    return {"doc_ids": vector_repository.list_doc_ids()}
+
+
 @router.delete("/{doc_id}")
 def delete_document(doc_id: str):
     vector_repository.delete_document(doc_id)

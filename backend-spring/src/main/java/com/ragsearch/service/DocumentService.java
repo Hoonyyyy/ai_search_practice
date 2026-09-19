@@ -11,6 +11,8 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -19,6 +21,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -87,8 +90,12 @@ public class DocumentService {
                         emitter.send(SseEmitter.event().comment("heartbeat"));
                     } catch (Exception ignored) {}
                 }, 5, 5, java.util.concurrent.TimeUnit.SECONDS);
+
                 try {
                     aiServiceClient.embedAndStore(docId, file.getOriginalFilename(), chunks, emitter);
+                } catch (Exception e) {
+                    cleanupLeftoverVectors(docId);
+                    throw e;
                 } finally {
                     heartbeatExecutor.shutdownNow();
                 }
@@ -149,7 +156,61 @@ public class DocumentService {
         documentRepository.deleteById(docId);
     }
 
+    /**
+     * Qdrant에는 있지만 H2에는 없는 doc_id - 업로드 중단 강제 종료로 남은 잔여 벡터.
+     */
+    public List<String> findLeftoverDocIds() {
+        Set<String> known = documentRepository.findAll().stream()
+                .map(Document::getDocId)
+                .collect(Collectors.toSet());
+
+        return aiServiceClient.listDocIds().stream()
+                .filter(docId -> !known.contains(docId))
+                .toList();
+    }
+
+    /**
+     * 잔여 벡터를 실제로 삭제한다. 되돌릴 수 없으므로 자동 실행하지 않고
+     * 명시적인 요청이 있을 때만 호출한다.
+     */
+    public int cleanupLeftovers() {
+        List<String> leftovers = findLeftoverDocIds();
+        for (String docId : leftovers) {
+            aiServiceClient.deleteVectors(docId);
+            log.warn("잔여 벡터 삭제 (docId={})", docId);
+        }
+        log.info("잔여 벡터 정리 완료 - {}건", leftovers.size());
+        return leftovers.size();
+    }
+
+    /**
+     * 앱이 완전히 뜬 직후 정합성을 점검하고 경고만 남긴다.
+     * 삭제는 하지 않는다 - 사람이 확인하고 결정
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void checkLeftoversOnStartup() {
+        try {
+            List<String> leftovers = findLeftoverDocIds();
+            if (leftovers.isEmpty()) {
+                log.info("정합성 점검 OK - 잔여 벡터 없음");
+            } else {
+                log.warn("잔여 벡터 {}건 발견 - 정리하려면 POST /api/documents/cleanup {}" , leftovers.size(), leftovers);
+            }
+        } catch (Exception e) {
+            log.warn("정합성 점검 건너뜀 (AI 서비스 미기동?) - {}", e.getMessage());
+        }
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private void cleanupLeftoverVectors(String docId) {
+        try {
+            aiServiceClient.deleteVectors(docId);
+            log.warn("업로드 실패 → 잔여 벡터 정리 완료 (docId={})", docId);
+        } catch (Exception cleanupError) {
+            log.error("잔여 벡터 정리 실패 (docId={})", docId, cleanupError);
+        }
+    }      
 
     private void validateExtension(String filename) {
         if (filename == null) throw new IllegalArgumentException("파일명이 없습니다.");
@@ -165,7 +226,11 @@ public class DocumentService {
             try (PDDocument doc = Loader.loadPDF(file.getBytes())) {
                 PDFTextStripper stripper = new PDFTextStripper();
                 // 다단(컬럼) 레이아웃 PDF에서 텍스트가 좌→우, 상→하 순서로 읽히도록.
-                // 이력서·양식 문서처럼 컬럼이 많은 PDF의 추출 품질이 크게 좋아진다.
+                // true/false 를 평가셋 18문항으로 끝까지 비교한 결과 true 가 명확히 우세하다.
+                //   Recall@4  94.4% vs 77.8%  /  MRR@4 0.815 vs 0.634
+                //   답변 정확도 13/18 vs 8/18  /  과잉 거절 2 vs 5
+                // false 에서는 틀린 숫자를 자신 있게 답하는 사례도 나왔다(50cm 를 15cm 로).
+                // 추출된 텍스트가 사람 눈에 읽기 좋은 것과 검색·LLM 이 다루기 좋은 것은 다르다.
                 stripper.setSortByPosition(true);
                 return stripper.getText(doc);
             }

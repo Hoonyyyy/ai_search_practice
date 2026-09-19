@@ -158,6 +158,17 @@ public class AiServiceClient {
     }
 
     /**
+     * Qdrant에 실제로 저장돼 있는 doc_id 목록.
+     * H2의 문서 목록과 비교해 잔여 벡터를 찾아내는 데 쓴다.
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> listDocIds() {
+        String url = aiServiceUrl + "/ai/documents/doc-ids";
+        ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+        return (List<String>) response.getBody().get("doc_ids");
+    }
+
+    /**
      * Qdrant에서 문서 벡터 삭제. 502 시 최대 60초간 재시도.
      */
     public void deleteVectors(String docId) {
