@@ -11,13 +11,26 @@ dataset.json 의 질문을 하나씩 검색해서, 기대한 내용이 상위 k�
 import argparse
 import io
 import json
+import re
 import time
+import unicodedata
 from pathlib import Path
 
 import requests
 
 BASE = Path(__file__).parent
 AI_URL = "http://127.0.0.1:8001"
+
+
+def normalize(text: str) -> str:
+    """비교용 정규화.
+
+    LLM 과 PDF 는 눈에 안 보이는 공백을 섞어 쓴다. 예를 들어 LLM 은
+    "50 cm" 의 공백으로 U+202F(NARROW NO-BREAK SPACE) 를 쓰는데, 화면에는
+    보통 공백과 똑같이 보이지만 문자열 비교는 실패한다.
+    NFKC 로 호환 문자를 펴고, 모든 공백류를 보통 공백 하나로 접는다.
+    """
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", text))
 
 
 def search(question: str, top_k: int):
@@ -32,8 +45,9 @@ def search(question: str, top_k: int):
 
 def find_rank(chunks, expect: str):
     """기대 문자열이 몇 번째 결과에 들어있는지. 없으면 None."""
+    needle = normalize(expect)
     for rank, chunk in enumerate(chunks, start=1):
-        if expect in chunk["content"]:
+        if needle in normalize(chunk["content"]):
             return rank
     return None
 

@@ -78,5 +78,15 @@
     "question": "시스템이 부팅되지 않을 때 복구하는 방법은 무엇인가요?",
     "expect": "F4",
     "doc": "Galaxybook_guide.pdf"
+  },
+  {
+    "question": "제품을 바꾸거나 돈을 돌려받으려면 어디로 가야 하나요?",
+    "expect": "구입처",
+    "doc": "Galaxybook_guide.pdf"
+  },
+  {
+    "question": "이전 직장을 그만둔 이유가 무엇인가요?",
+    "expect": "계약만료",
+    "doc": "사람인_이력서_강현수.pdf"
   }
 ]
