@@ -48,5 +48,35 @@
     "question": "자격증은 어떤 걸 가지고 있나요?",
     "expect": "산림기사",
     "doc": "사람인_이력서_강현수.pdf"
+  },
+  {
+    "question": "취약점 대응해본 경험이 있나요?",
+    "expect": "XSS",
+    "doc": "사람인_이력서_강현수.pdf"
+  },
+  {
+    "question": "PC를 사용하려면 실제 사용자와 거리가 어느정도 멀어져야 하나요?",
+    "expect": "50 cm",
+    "doc": "Galaxybook_guide.pdf"
+  },
+  {
+    "question": "몇년생 이신가요?",
+    "expect": "29세",
+    "doc": "사람인_이력서_강현수.pdf"
+  },
+  {
+    "question": "설정 파일에 들어있는 민감 정보는 어떻게 관리했나요?",
+    "expect": "root-context.xml",
+    "doc": "사람인_이력서_강현수.pdf"
+  },
+  {
+    "question": "서비스 포트나 프로세스 상태를 어떤 도구로 점검했나요?",
+    "expect": "netstat",
+    "doc": "사람인_이력서_강현수.pdf"
+  },
+  {
+    "question": "시스템이 부팅되지 않을 때 복구하는 방법은 무엇인가요?",
+    "expect": "F4",
+    "doc": "Galaxybook_guide.pdf"
   }
 ]
