@@ -226,7 +226,11 @@ public class DocumentService {
             try (PDDocument doc = Loader.loadPDF(file.getBytes())) {
                 PDFTextStripper stripper = new PDFTextStripper();
                 // 다단(컬럼) 레이아웃 PDF에서 텍스트가 좌→우, 상→하 순서로 읽히도록.
-                // 이력서·양식 문서처럼 컬럼이 많은 PDF의 추출 품질이 크게 좋아진다.
+                // true/false 를 평가셋 18문항으로 끝까지 비교한 결과 true 가 명확히 우세하다.
+                //   Recall@4  94.4% vs 77.8%  /  MRR@4 0.815 vs 0.634
+                //   답변 정확도 13/18 vs 8/18  /  과잉 거절 2 vs 5
+                // false 에서는 틀린 숫자를 자신 있게 답하는 사례도 나왔다(50cm 를 15cm 로).
+                // 추출된 텍스트가 사람 눈에 읽기 좋은 것과 검색·LLM 이 다루기 좋은 것은 다르다.
                 stripper.setSortByPosition(true);
                 return stripper.getText(doc);
             }
