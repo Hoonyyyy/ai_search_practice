@@ -43,11 +43,11 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", text))
 
 
-def answer(question: str):
+def answer(question: str, top_k: int):
     """검색 -> LLM 스트리밍. 실제 서비스와 같은 경로를 탄다."""
     chunks = requests.post(
         f"{AI_URL}/ai/search",
-        json={"query": question, "top_k": TOP_K},
+        json={"query": question, "top_k": top_k},
         timeout=180,
     ).json()["chunks"]
 
@@ -72,6 +72,7 @@ def answer(question: str):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=0, help="답 있는 질문 개수 제한 (0=전부)")
+    parser.add_argument("--top-k", type=int, default=TOP_K, help="LLM 에 넘길 청크 수")
     args = parser.parse_args()
 
     answerable = json.load(io.open(BASE / "dataset.json", encoding="utf-8"))
@@ -82,7 +83,7 @@ def main():
     correct = refused_wrongly = 0
     print("\n-- 답이 있는 질문 --")
     for item in answerable:
-        text, sec = answer(item["question"])
+        text, sec = answer(item["question"], args.top_k)
         norm = normalize(text)
         refused = normalize(REFUSAL) in norm
         hit = normalize(item["expect"]) in norm
@@ -96,7 +97,7 @@ def main():
     hallucinated = 0
     print("\n-- 답이 없는 질문 --")
     for item in negative:
-        text, sec = answer(item["question"])
+        text, sec = answer(item["question"], args.top_k)
         refused = normalize(REFUSAL) in normalize(text)
         hallucinated += not refused
         print(f"  {'OK  ' if refused else '환각'} ({sec:5.1f}s) {item['question']}")
@@ -105,6 +106,7 @@ def main():
             print(f"        근거: {item['why']}")
 
     a, n = len(answerable), len(negative)
+    print(f"(top_k = {args.top_k})")
     print("\n" + "-" * 78)
     print(f"답변 정확도   : {correct}/{a}  ({correct / a * 100:.1f}%)   기대 문자열이 답변에 포함됨")
     print(f"과잉 거절     : {refused_wrongly}/{a}  ({refused_wrongly / a * 100:.1f}%)   답이 있는데 거절함")
