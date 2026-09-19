@@ -46,13 +46,17 @@ def upload(path: Path):
             timeout=900,
         )
         resp.raise_for_status()
-        last = {}
+        # 이벤트마다 필요한 값이 따로 온다(진행률은 total, 완료는 chunk_count).
+        # 마지막 이벤트만 보면 놓치므로 계속 덮어쓰며 모은다.
+        info = {}
         for line in resp.iter_lines(decode_unicode=True):
             if line and line.startswith("data: "):
-                last = json.loads(line[6:])
-                if last.get("stage") == "error":
-                    raise RuntimeError(last.get("message"))
-    print(f"  업로드: {path.name}  {last.get('chunk_count', '?')}청크  {time.time() - started:.0f}초")
+                event = json.loads(line[6:])
+                if event.get("stage") == "error":
+                    raise RuntimeError(event.get("message"))
+                info.update(event)
+    count = info.get("chunk_count") or info.get("total_chunks") or "?"
+    print(f"  업로드: {path.name}  {count}청크  {time.time() - started:.0f}초")
 
 
 def main():
