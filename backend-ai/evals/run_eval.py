@@ -47,6 +47,7 @@ def main():
 
     hits = 0
     doc_hits = 0
+    rr_sum = 0.0
     total_ms = 0.0
     rows = []
 
@@ -62,6 +63,9 @@ def main():
 
         hits += rank is not None
         doc_hits += doc_ok
+
+        rr_sum += 1 / rank if rank else 0
+
         rows.append((item, rank, doc_ok, took_ms, got_docs))
 
     n = len(dataset)
@@ -81,6 +85,10 @@ def main():
     print("-" * 78)
     print(f"Recall@{k}     : {hits}/{n}  ({hits / n * 100:.1f}%)")
     print(f"문서 적중@{k}  : {doc_hits}/{n}  ({doc_hits / n * 100:.1f}%)")
+
+    print(f"MRR@{k}   : {rr_sum / n:.3f}")
+    
+
     print(f"평균 검색 시간 : {total_ms / n:.0f}ms\n")
 
 
