@@ -32,4 +32,9 @@ RUN mkdir -p /app/data
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8", "-jar", "app.jar"]
+ENTRYPOINT ["java", \
+  "-XX:MaxRAMPercentage=70", \
+  "-XX:+UseSerialGC", \
+  "-Xss512k", \
+  "-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8", \
+  "-jar", "app.jar"]

@@ -2,6 +2,90 @@
 
 ---
 
+## v4.15 — Qdrant Cloud 전환 + 호스팅 준비 (서버에 남은 것은 코드뿐)
+
+### 마지막 로컬 저장소를 밖으로
+Qdrant 는 `backend-ai/data/qdrant` 파일이었다. H2 와 같은 문제(재배포 시 소멸)에 더해
+**임베디드 모드는 한 프로세스만 열 수 있다**는 제약이 있었다. 실제로 이번 작업 중 겪었다.
+
+```
+RuntimeError: Storage folder ... is already accessed by another instance of Qdrant client
+```
+
+FastAPI 가 파일을 잡고 있어 별도 스크립트로 벡터를 조회할 수 없었다.
+서버가 여러 개로 늘어나면 쓸 수 없는 구조다.
+
+**코드 변경은 없었다.** v3.4 에서 만들어둔 분기가 그대로 동작했다.
+
+```python
+if settings.qdrant_url:
+    _client = QdrantClient(url=..., api_key=...)
+else:
+    _client = QdrantClient(path=settings.qdrant_path)
+```
+
+`.env` 두 줄로 전환했고, 3072차원 컬렉션이 자동 생성됐다.
+
+### 저장소를 바꿔도 품질은 같아야 한다 — 확인했다
+```
+Recall@4 83.3%   문서 적중 100%   MRR@4 0.722     ← 전환 전과 동일
+```
+벡터가 같으면 결과도 같다. 예상되는 결과라도 확인하고 넘어간다.
+
+### 공짜였던 호출이 비싸졌다
+검색 지연이 262ms → 781ms 가 됐다. 단계를 쪼개보니 Qdrant 를 **두 번** 부르고 있었다.
+
+```
+임베딩(OpenAI)  ~240ms
+count()         ~220ms     ← 청크 수 확인. 로컬 파일일 때는 0ms 였다
+query_points()  ~220ms
+```
+
+`full_context_threshold` 판단을 위해 매 검색마다 `count()` 를 부른다.
+로컬 파일에서는 공짜라 아무도 신경 쓰지 않던 호출이 **원격이 되자 전체의 30%** 가 됐다.
+
+**코드는 한 줄도 바뀌지 않았는데 최적이던 구조가 아니게 됐다.** 실행 환경이 바뀌면
+비용 구조가 바뀐다는 것을 측정으로 확인했다. 청크 수는 업로드·삭제 때만 변하므로
+캐시하면 없앨 수 있다. 다만 **배포 후 재측정 전까지는 고치지 않는다** —
+서버가 미국에 있으면 두 왕복 모두 20ms 수준이 되어 고칠 가치가 없어질 수 있다.
+
+### 호스팅 준비 — 포트는 우리가 정하지 않는다
+클라우드 호스팅은 `PORT` 환경변수로 사용할 포트를 지정한다. 앱이 8080 을 고집하면
+서비스는 떠 있는데 요청이 닿지 않는, 원인을 찾기 어려운 상태가 된다.
+
+- `application.yml` — `port: ${PORT:8080}` (로컬 기본값 유지)
+- `backend-ai/Dockerfile` — `CMD` 를 **셸 형식**으로. 대괄호(exec) 형식은 셸을 거치지 않아
+  `${PORT}` 가 문자열 그대로 전달된다
+
+### JVM 메모리 — v3.4 의 OOM 을 미리 막는다
+현재 실측은 Spring 235MB / FastAPI 131MB 로, 각각 512MB 에 여유 있게 들어간다.
+임베딩·벡터·DB 가 전부 외부로 나가 서버에는 요청을 중계하는 코드만 남았기 때문이다.
+그래도 여유를 확보해둔다.
+
+```
+-XX:MaxRAMPercentage=70   컨테이너 크기 기준으로 힙 상한 설정
+-XX:+UseSerialGC          작은 힙에서는 병렬 GC 가 오히려 손해
+-Xss512k                  스레드 스택 축소
+```
+
+### 현재 구성
+| 무엇 | 어디 |
+|---|---|
+| 문서·쿼리 로그 | Supabase Postgres (서울) |
+| 벡터 | Qdrant Cloud (N. Virginia) |
+| 임베딩 | OpenAI |
+| LLM | Groq |
+| **서버** | **코드만** |
+
+리전이 흩어져 있다. 호스팅 위치를 정한 뒤 맞출 예정이다(Supabase 는 데이터가 적어 재생성 비용이 낮다).
+
+### 변경 사항
+- `application.yml` — `server.port` 를 `${PORT:8080}` 으로
+- `backend-ai/Dockerfile` — `CMD` 셸 형식 + `${PORT:-8001}`
+- `backend-spring/Dockerfile` — JVM 메모리 옵션 3종 추가
+
+---
+
 ## v4.14 — H2 → Supabase Postgres (프로필로 전환, 자바 코드 변경 0줄)
 
 ### 왜 바꿨나
