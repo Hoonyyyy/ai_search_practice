@@ -2,6 +2,96 @@
 
 ---
 
+## v4.14 — H2 → Supabase Postgres (프로필로 전환, 자바 코드 변경 0줄)
+
+### 왜 바꿨나
+H2 는 `backend-spring/data/ragsearch` 라는 **파일**이다. 무료 호스팅은 재배포할 때마다
+디스크가 초기화되므로, 배포 상태에서는 코드 한 줄 고쳐 올릴 때마다 이렇게 된다.
+
+```
+문서 목록      → 사라짐
+대시보드 이력  → 사라짐
+Qdrant 벡터    → 남아 있음      ← 매 배포마다 잔여 벡터 발생
+```
+
+**DB 는 서버 밖에 있어야 한다.** 서버가 죽거나 재배포되어도 데이터는 별도로 남는다.
+H2 는 애초에 운영 DB 가 아니라 테스트용이기도 하다.
+
+### 환경변수 4개가 아니라 프로필을 쓴 이유
+임베딩(v4.12)은 `EMBED_PROVIDER` 환경변수 하나로 전환했다. DB 는 다르게 했다.
+
+DB 전환은 **URL·드라이버·계정·비밀번호 네 개가 함께** 바뀐다. 환경변수로 하면
+URL 만 Postgres 로 바꾸고 드라이버를 안 바꾸는 **어중간한 상태**가 만들어질 수 있다.
+
+프로필은 네 개가 한 덩어리로 움직인다. 절반만 바뀐 상태가 **애초에 불가능하다.**
+"잘못된 상태를 표현할 수 없게 만든다"는 기준을 따랐다.
+
+```
+application.yml            기본 — H2 (로컬 개발은 그대로)
+application-supabase.yml   SPRING_PROFILES_ACTIVE=supabase 로 켠다
+```
+
+비밀번호는 `${SUPABASE_DB_PASSWORD}` 로 **기본값 없이** 받는다. 환경변수가 없으면
+기동 자체가 실패한다 — 파일에 적지 않기 위해서이고, 빠뜨렸을 때 조용히 넘어가지 않게 하려는 것이다.
+
+### 자바 코드는 한 줄도 바뀌지 않았다
+JPA 를 쓰고 있어 엔티티·레포지토리·서비스 모두 그대로다.
+바뀐 것은 **의존성 하나(postgresql 드라이버)와 설정 파일 하나**뿐이다.
+`ddl-auto: update` 가 엔티티를 보고 `documents` / `query_logs` 테이블을 SQL 없이 생성했다.
+
+### 접속은 Session pooler 를 쓴다
+Supabase 의 Direct connection 은 IPv6 주소를 준다. 이 PC 는 v4.7 에서
+**IPv6 폴백 때문에 요청마다 2초를 잃던** 이력이 있다. Session pooler 는 IPv4 로 붙는다.
+같은 함정을 두 번 밟지 않기 위한 선택이다.
+
+### RLS — 안 쓰는 문을 닫았다
+Supabase 는 `public` 스키마의 테이블을 REST API 로 자동 공개하며, RLS 가 꺼져 있으면
+Table Editor 에 빨간 `Unrestricted` 배지가 붙는다.
+
+우리는 Data API 를 쓰지 않는다(프론트엔드는 Spring 만 호출한다). 쓰지 않는 경로는 닫는다.
+
+```sql
+alter table documents  enable row level security;
+alter table query_logs enable row level security;
+```
+
+정책을 하나도 만들지 않으면 전부 거부된다. 반면 Spring 은 테이블 **소유자**인
+`postgres` 로 접속하므로 RLS 를 통과한다. 필요한 문만 열려 있는 상태가 된다.
+`documents` 에는 이력서 파일명 같은 개인정보가 들어가므로 더 그렇다.
+
+**적용 후 실제로 확인했다** — RLS 를 켠 뒤에도 `/api/documents/leftovers` 가 정상 응답했다.
+
+### 전환 중 예고된 상황이 그대로 발생했다
+DB 를 바꾼 직후 Postgres 는 문서 0건, Qdrant 는 벡터 136개였다.
+**배포할 때마다 생길 것이라고 예측했던 잔여 벡터가 DB 전환에서 먼저 나타났다.**
+
+v4.6 에서 만든 도구로 처리했다. 감지(`GET /leftovers`) → 정리(`POST /cleanup`) → 재적재.
+정리하지 않고 재적재했다면 벡터가 272개가 되어 검색이 오염됐을 것이다.
+
+**v4.6 에서 자동 삭제(A안) 대신 경고만(C안) 선택한 판단도 여기서 값을 했다.**
+자동 삭제였다면 DB 를 바꾼 순간 Qdrant 컬렉션이 통째로 지워졌을 것이다.
+
+### 검증
+```
+Postgres  documents  : 사람인_이력서 14청크 + Galaxybook 122청크
+Qdrant    doc-ids    : 동일한 doc_id 2개
+검색                 : 정답 청크 반환
+query_logs           : 검색 1회 후 1건 기록
+대시보드             : total_queries 1, avg 1508ms, tokens 1496
+```
+
+### 과거 쿼리 로그는 옮기지 않았다
+H2 에 쌓인 이력에는 **IPv6 문제를 고치기 전의 4,485ms 기록**이 섞여 있다.
+가져오면 평균이 계속 나빠 보인다. 새로 시작하는 쪽이 현재 성능을 정직하게 보여준다.
+옛 기록은 H2 파일에 그대로 남아 있어 필요하면 꺼낼 수 있다.
+
+### 변경 사항
+- `pom.xml` — `org.postgresql:postgresql` (runtime) 추가, 버전은 부모 POM 관리에 맡김
+- `application-supabase.yml` 신설 — datasource / dialect / h2 콘솔 비활성
+- `application.yml` 무변경 — 로컬 기본값은 H2 유지
+
+---
+
 ## v4.13 — 임베딩 모델 3종 비교: 클라우드로 전환, 품질 11%p 를 배포 가능성과 맞바꿨다
 
 ### 배경
@@ -19,7 +109,7 @@ v4.12 에서 `embed_provider` 를 만들어두고 **어떤 모델을 쓸지는 �
 | MRR@4 | **0.815** | 0.361 | 0.722 |
 | 답변 정확도 | 72.2% | — | **77.8%** |
 | 과잉 거절 | 2/18 | — | **1/18** |
-| 업로드(122청크) | 93초 | **4.7초** | 8초 |
+| 업로드(122청크) | 83.6초 | **4.7초** | 6.8초 |
 | 검색 지연 | **64ms** | 278ms | 262ms |
 
 ### 하마터면 틀린 결론을 남길 뻔했다
