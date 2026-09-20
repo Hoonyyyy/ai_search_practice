@@ -1,0 +1,16 @@
+# 배포용 프로필. SPRING_PROFILES_ACTIVE=supabase 로 켠다.
+# 로컬은 application.yml 의 H2 를 그대로 쓴다.
+
+spring:
+  datasource:
+    url: jdbc:postgresql://aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
+    driver-class-name: org.postgresql.Driver
+    username: postgres.twgoaykyjtoyqqslfmbl
+    password: ${SUPABASE_DB_PASSWORD}
+  h2:
+    console:
+      enabled: false
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
