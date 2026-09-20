@@ -58,6 +58,13 @@ def _get_client() -> QdrantClient:
 
 
 def _embed(texts: List[str], task: str = "search_document") -> List[List[float]]:
+    """provider 에 따라 임베딩 백엔드를 고른다."""
+    if settings.embed_provider == "ollama":
+        return _embed_ollama(texts, task)
+    return _embed_cloud(texts)
+
+
+def _embed_ollama(texts: List[str], task: str = "search_document") -> List[List[float]]:
     """Ollama 로 텍스트 → 임베딩 벡터. 한 번에 배치 처리.
 
     nomic-embed-text 는 task 접두사(`search_document:` / `search_query:`)를
@@ -75,6 +82,29 @@ def _embed(texts: List[str], task: str = "search_document") -> List[List[float]]
     )
     resp.raise_for_status()
     return resp.json()["embeddings"]
+
+
+def _embed_cloud(texts: List[str]) -> List[List[float]]:
+    """OpenAI 호환 임베딩 API 로 텍스트 → 임베딩 벡터.
+
+    Ollama 와 달리 응답이 {"data": [{"embedding": [...]}, ...]} 형태다.
+    """
+    if not settings.embed_api_key:
+        raise RuntimeError("EMBED_API_KEY 가 없습니다. .env 를 확인하세요.")
+    
+    resp = requests.post(
+        f"{settings.embed_api_url}/embeddings",
+        headers={"Authorization": f"Bearer {settings.embed_api_key}"},
+        json={
+            "model": settings.embed_cloud_model, 
+            "input": texts,
+        },
+        timeout=120,
+    )
+    resp.raise_for_status()
+    return [item["embedding"] for item  in resp.json()["data"]]
+
+
 
 
 def add_chunks_stream(doc_id: str, filename: str, chunks: List[str]) -> Generator:
@@ -174,13 +204,6 @@ def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
     print(f"[search timing] client {t_client*1000:.0f}ms, "
           f"count {t_count*1000:.0f}ms, embed {t_embed*1000:.0f}ms, query {t_query*1000:.0f}ms, "
           f"total {(time.time()-t_start)*1000:.0f}ms (총 {total}개 청크)", flush=True)
-
-    if 0 < total <= settings.full_context_threshold:
-        pts, _ = client.scroll(...)
-        pts.sort(...)
-        print(f"[search timing] 전체 컨텍스트 모드 - {total}개 전부 반환", flush=True)
-        return [_to_dict(p.payload, 1.0) for p in pts]
-
 
     return [_to_dict(h.payload, h.score) for h in result.points]
 
