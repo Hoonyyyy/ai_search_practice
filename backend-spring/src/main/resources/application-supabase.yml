@@ -7,6 +7,11 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: postgres.twgoaykyjtoyqqslfmbl
     password: ${SUPABASE_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5      # 무료 티어 한도 15 를 나눠 쓴다
+      minimum-idle: 1           # 놀 때는 1개만 유지
+      idle-timeout: 30000       # 30초 놀면 반납
+      max-lifetime: 600000      # 10분마다 커넥션 갱신
   h2:
     console:
       enabled: false
