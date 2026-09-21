@@ -132,12 +132,17 @@ public class DocumentService {
                 ));
                 emitter.complete();
 
-            } catch (IllegalArgumentException e) {
+            } catch (InvalidUploadException e) {
                 sendEventQuietly(emitter, Map.of("stage", "error", "message", e.getMessage()));
                 emitter.complete();
             } catch (Exception e) {
-                log.error("업로드 처리 실패", e);
-                emitter.completeWithError(e);
+                if (ErrorMessages.isClientGone(e)) {
+                    log.info("사용자가 연결을 끊어 업로드를 취소했습니다");
+                } else {
+                    log.error("업로드 처리 실패", e);
+                    sendEventQuietly(emitter, Map.of("stage", "error", "message", ErrorMessages.forUpload(e)));
+                }
+                emitter.complete();
             }
         });
 
@@ -151,9 +156,20 @@ public class DocumentService {
                 .toList();
     }
 
+    /**
+     * 기록 -> 벡터 순서로 지운다 (업로드의 역순).
+     * 중간에 실패하면 "기록 없는 벡터" (잔여 벡터)가 남는데, 이건 기동 시 점검과 /cleanup 으로 잡힌다.
+     * 반대 순서면 "벡터 없는 기록"이 남아 감지할 방법이 없다.
+     */
     public void deleteDocument(String docId) {
-        aiServiceClient.deleteVectors(docId);
         documentRepository.deleteById(docId);
+        try {
+            aiServiceClient.deleteVectors(docId);
+        } catch (Exception e) {
+            log.warn("문서 기록은 삭제했으나 벡터 삭제 실패 -> 잔여 벡터로 남음 (docId={}). "
+                    + "POST /api/documents/cleanup 으로 정리하세요", docId, e);
+        }
+
     }
 
     /**
@@ -213,11 +229,11 @@ public class DocumentService {
     }      
 
     private void validateExtension(String filename) {
-        if (filename == null) throw new IllegalArgumentException("파일명이 없습니다.");
+        if (filename == null) throw new InvalidUploadException("파일명이 없습니다.");
         String lower = filename.toLowerCase();
         boolean allowed = Arrays.stream(allowedExtensions.split(","))
                 .anyMatch(lower::endsWith);
-        if (!allowed) throw new IllegalArgumentException("PDF, TXT, MD 파일만 지원합니다.");
+        if (!allowed) throw new InvalidUploadException("PDF, TXT, MD 파일만 지원합니다.");
     }
 
     private String extractText(MultipartFile file) throws IOException {
