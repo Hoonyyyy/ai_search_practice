@@ -136,8 +136,12 @@ public class DocumentService {
                 sendEventQuietly(emitter, Map.of("stage", "error", "message", e.getMessage()));
                 emitter.complete();
             } catch (Exception e) {
-                log.error("업로드 처리 실패", e);
-                sendEventQuietly(emitter, Map.of("stage", "error", "message", ErrorMessages.forUpload(e)));
+                if (ErrorMessages.isClientGone(e)) {
+                    log.info("사용자가 연결을 끊어 업로드를 취소했습니다");
+                } else {
+                    log.error("업로드 처리 실패", e);
+                    sendEventQuietly(emitter, Map.of("stage", "error", "message", ErrorMessages.forUpload(e)));
+                }
                 emitter.complete();
             }
         });
