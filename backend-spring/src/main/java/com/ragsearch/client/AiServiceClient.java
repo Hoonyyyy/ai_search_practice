@@ -146,7 +146,9 @@ public class AiServiceClient {
                                 tokens[0] = (int) event.getOrDefault("input_tokens", 0);
                                 tokens[1] = (int) event.getOrDefault("output_tokens", 0);
                             } else if ("error".equals(type)) {
-                                emitter.send(SseEmitter.event().data(data));
+                                // FastAPI가 보낸 에러 원문은 내부 정보를 담을 수 있다.
+                                // 로그에만 남기고, 사용자 메시지는 SearchService의 ErrorMessages가 정한다.
+                                throw new IllegalStateException("AI 서비스 LLM 오류: " + event.get("content"));
                             }
                         }
                     }

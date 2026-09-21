@@ -112,13 +112,15 @@ public class SearchService {
             } catch (Exception e) {
                 log.error("검색 처리 실패", e);
                 sendEventQuietly(emitter, Map.of("type", "error",
-                        "content", "검색 중 오류가 발생했습니다: " + e.getMessage()));
+                        "content", ErrorMessages.forSearch(e)));
                 emitter.complete();
             }
         });
 
         return emitter;
     }
+
+
 
     public void saveFeedback(String queryId, double score) {
         queryLogRepository.findById(queryId).ifPresent(log -> {

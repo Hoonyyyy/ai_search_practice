@@ -132,12 +132,13 @@ public class DocumentService {
                 ));
                 emitter.complete();
 
-            } catch (IllegalArgumentException e) {
+            } catch (InvalidUploadException e) {
                 sendEventQuietly(emitter, Map.of("stage", "error", "message", e.getMessage()));
                 emitter.complete();
             } catch (Exception e) {
                 log.error("업로드 처리 실패", e);
-                emitter.completeWithError(e);
+                sendEventQuietly(emitter, Map.of("stage", "error", "message", ErrorMessages.forUpload(e)));
+                emitter.complete();
             }
         });
 
@@ -213,11 +214,11 @@ public class DocumentService {
     }      
 
     private void validateExtension(String filename) {
-        if (filename == null) throw new IllegalArgumentException("파일명이 없습니다.");
+        if (filename == null) throw new InvalidUploadException("파일명이 없습니다.");
         String lower = filename.toLowerCase();
         boolean allowed = Arrays.stream(allowedExtensions.split(","))
                 .anyMatch(lower::endsWith);
-        if (!allowed) throw new IllegalArgumentException("PDF, TXT, MD 파일만 지원합니다.");
+        if (!allowed) throw new InvalidUploadException("PDF, TXT, MD 파일만 지원합니다.");
     }
 
     private String extractText(MultipartFile file) throws IOException {
