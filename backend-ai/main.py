@@ -1,7 +1,15 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from config import settings
 from routers import documents, search, llm
 
 app = FastAPI(title="RAG AI Service", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allowed_origins.split(","),
+    allow_methods=["GET"],
+)
 
 app.include_router(documents.router, prefix="/ai")
 app.include_router(search.router, prefix="/ai")

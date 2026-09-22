@@ -2,6 +2,70 @@
 
 ---
 
+## v4.23 — Render 안에서 부르면 FastAPI 는 깨어나지 않는다: 브라우저가 직접 깨운다
+
+### 증상 — 배너는 끝났는데 검색이 102초 걸렸다
+v4.21 배너를 운영에서 확인하던 밤(평일 낮 keep-alive 밖). 배너 → 2분 뒤 목록 자동 표시까지는 설계대로였다.
+그 직후 질문했더니 평소 5초 안에 나오던 답이 **102초** 걸렸다.
+
+### 원인 — 배너가 FastAPI 를 보지 않았고, Spring 은 FastAPI 를 깨우지 못했다
+**1. 배너의 "준비됨"은 Spring + Supabase 까지만이었다.** `/api/documents` 는 FastAPI 를 거치지 않는다.
+배너가 사라져 "다 됐다"고 믿게 한 뒤 또 기다리게 했다. 배너가 없을 때보다 더 헷갈린다.
+
+**2. Spring 이 부르는 FastAPI 는 깨어나지 않았다.** Render 로그로 재구성한 시간(UTC):
+
+```
+14:43:45  Spring 기동 → 정합성 점검이 FastAPI 호출 → 즉시 502
+14:45:45  검색 → Spring 재시도 1/30 ... 13/30 (14:46:52) — 70초, 13번 모두 즉시 502
+14:46:51  (확인하려고) 바깥에서 FastAPI /health 직접 호출
+14:46:58  재시도 14 — 502 로그 없음. 즉시 502 가 아니라 붙잡혀서 기다림
+14:47:16  FastAPI "Started server process"  ← 바깥 호출 25초 뒤
+14:47:25  검색 답변 (102초)
+```
+
+- Spring 은 **3분 30초 동안** FastAPI 를 불렀지만 FastAPI 는 켜지지 않았다
+- 바깥에서 한 번 부르자 25초 만에 켜졌고, 그 뒤로는 Spring 의 요청도 붙잡혀서 기다렸다
+- 바깥(브라우저, curl, GitHub Actions)에서 잠든 서비스를 부르면 Render 가 **요청을 붙잡고 깨운다.**
+  Render 안의 Spring 이 공개 주소로 부르면 **즉시 502 만 돌려주고 깨우지 않는다** (관찰된 동작. Render 내부 이유는 모른다)
+
+바깥에서 부르지 않았다면 Spring 은 30번(150초) 재시도 끝에 **실패**했을 것이다.
+업로드(임베딩 저장)와 삭제(벡터 삭제)도 같은 길을 쓴다. 이 결함은 기능 전체에 걸려 있었다.
+
+v4.20 에서 "Spring 이 깨야 FastAPI 를 부르니 순서대로 깬다"고 썼다. 틀렸다. **Spring 은 FastAPI 를 깨우지 못한다.**
+그날 21:28 측정에서 Spring 이 깬 뒤 18초 만에 검색이 된 건, 그때 FastAPI 가 이미 깨어 있었기 때문으로 보인다(당시 FastAPI 상태는 재지 않았다).
+
+측정하는 쪽이 결과를 바꾼 사례이기도 하다. 원인을 보려고 보낸 `/health` 가 FastAPI 를 깨웠다.
+두 해석(바깥 호출이 깨웠다 / FastAPI 가 원래 100초 걸린다)이 같은 시각표를 만들어서, **Spring 재시도 로그**로 갈랐다.
+
+### 고침 — 브라우저가 FastAPI 도 직접, 동시에 깨운다
+| 파일 | 변경 |
+|---|---|
+| `backend-ai/config.py` | `cors_allowed_origins` (환경변수 `CORS_ALLOWED_ORIGINS`, Spring 과 같은 이름) |
+| `backend-ai/main.py` | `CORSMiddleware` — 허용 출처에 **GET 만** 연다 |
+| `frontend/src/api/server.ts` | `pingServer()` = `Promise.all([Spring /documents, FastAPI /health])` 둘 다 성공해야 true. `wakeAiService()` = 기다리지 않고 FastAPI 를 두드리기만 |
+| `hooks/useSearch.ts`, `hooks/useUpload.ts` | 검색·업로드·삭제 직전에 `wakeAiService()` |
+
+- **배너가 사라지면 검색까지 된다.** "준비됨"의 기준을 FastAPI 까지 넓혔다
+- **동시에 깨운다.** `await A; await B` 가 아니라 `Promise.all` — 최악이 "Spring 2분 + FastAPI 2분"에서 "2분"으로
+- **버튼을 누를 때도 두드린다.** 페이지를 열어 둔 채 15분 넘게 비우면 둘 다 다시 잠든다. 배너 확인은 페이지를 열 때만 돈다
+- CORS 는 보안 장치가 아니다. 허락 헤더를 붙일 뿐이고, curl 은 무시한다. FastAPI 주소 공개 문제는 별개로 남는다
+
+#### 확인 (로컬 — 운영 상황 재현: Spring 만 켜고 FastAPI 는 끔)
+| 경우 | 결과 |
+|---|---|
+| CORS: Vercel 출처로 `/health` | 200 + `access-control-allow-origin: <Vercel>` |
+| CORS: 모르는 출처 | 200, 허락 헤더 없음 → 브라우저가 응답을 숨김 |
+| CORS: Vercel 에서 DELETE preflight | 400 `Disallowed CORS method` |
+| Spring 만 켬 | 배너가 **사라지지 않음** (수정 전이면 사라지고 검색에서 멈췄다) |
+| FastAPI 를 켬 | 5초 안에 배너가 사라지고, **검색이 바로 됨**. FastAPI 로그에 브라우저의 `GET /health 200` |
+
+### 배포 순서가 중요하다
+두 환경변수를 **머지 전에** 넣어야 한다. React 는 환경변수를 **빌드할 때** 코드에 박는다.
+- Vercel `REACT_APP_AI_URL` 이 없는 채로 빌드되면 `localhost:8001` 을 부른다 → FastAPI 확인이 영원히 실패 → 4분 뒤 빨간 배너
+- Render(FastAPI) `CORS_ALLOWED_ORIGINS` 가 없으면 기본값(localhost)만 허락 → 브라우저가 응답을 못 읽음 → 같은 결과
+
+---
+
 ## v4.22 — 운영에서만 보인 것들 (v4.19 배포 검증 기록) + 없는 문서 삭제는 404
 
 v4.17~v4.19 를 배포한 뒤(2026-09-21) 운영에서 같은 결함 주입을 다시 했다.

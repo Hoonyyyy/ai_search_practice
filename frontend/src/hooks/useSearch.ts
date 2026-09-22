@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SourceChunk, QueryResponse } from '../types';
 import { queryStream } from '../api/search';
+import { wakeAiService } from '../api/server';
 
 export function useSearch() {
   const [question, setQuestion] = useState('');
@@ -14,6 +15,7 @@ export function useSearch() {
   const search = async () => {
     if (!question.trim() || searching) return;
 
+    wakeAiService();
     setSearching(true);
     setStreaming(true);
     setStreamText('');
