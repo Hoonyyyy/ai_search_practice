@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DocumentInfo } from '../types';
-import { uploadDocument, listDocuments, deleteDocument } from '../api/documents';
+import { uploadDocument, listDocuments, deleteDocument, MAX_UPLOAD_MB } from '../api/documents';
 import { wakeAiService } from '../api/server';
 
 export interface UploadProgress {
@@ -21,6 +21,12 @@ export function useUpload() {
   };
 
   const upload = async (file: File) => {
+
+    const sizeMb = file.size / 1024 / 1024;
+    if (sizeMb > MAX_UPLOAD_MB) {
+      setError(`${MAX_UPLOAD_MB}MB 이하 파일만 올릴 수 있어요. (선택한 파일: ${file.name}, ${sizeMb.toFixed(1)}MB)`);
+      return;
+    }
     wakeAiService();
     setUploading(true);
     setUploadStatus('');

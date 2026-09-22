@@ -27,7 +27,7 @@ const SearchPanel: React.FC<Props> = ({ serverReady, onSearch, question, onQuest
           uploadStatus={uploadStatus}
           uploadProgress={uploadProgress}
         />
-        {uploadError && <p className={styles.error}>{uploadError}</p>}
+        {uploadError && <p className={styles.error} role="alert">⚠ {uploadError}</p>}
       </div>
 
       {docs.length > 0 && (

@@ -6,8 +6,8 @@ spring:
     property-naming-strategy: SNAKE_CASE
   servlet:
     multipart:
-      max-file-size: 200MB
-      max-request-size: 200MB
+      max-file-size: 10MB      # 측정(힙 358MB): 10MB × 동시 3개 = 피크 162MB (45%) — v4.25
+      max-request-size: 11MB   # 파일 + multipart 경계·헤더 여유
   datasource:
     url: jdbc:h2:file:./data/ragsearch
     driver-class-name: org.h2.Driver
