@@ -4,6 +4,7 @@ import { useUpload } from '../../hooks/useUpload';
 import styles from './SearchPanel.module.css';
 
 interface Props {
+  serverReady: boolean;
   onSearch: () => void;
   question: string;
   onQuestionChange: (q: string) => void;
@@ -11,10 +12,10 @@ interface Props {
   searchError: string;
 }
 
-const SearchPanel: React.FC<Props> = ({ onSearch, question, onQuestionChange, searching, searchError }) => {
+const SearchPanel: React.FC<Props> = ({ serverReady, onSearch, question, onQuestionChange, searching, searchError }) => {
   const { docs, uploading, uploadStatus, uploadProgress, error: uploadError, loadDocs, upload, remove } = useUpload();
 
-  useEffect(() => { loadDocs(); }, []);
+  useEffect(() => { if (serverReady) loadDocs(); }, [serverReady]);
 
   return (
     <div className={styles.container}>

@@ -7,6 +7,10 @@ import { getMetricsSummary, getTimeline, getRecentLogs } from '../../api/metrics
 import { MetricsSummary, TimelinePoint, QueryLog } from '../../types';
 import styles from './MetricsDashboard.module.css';
 
+interface Props {
+  serverReady: boolean;
+}
+
 const PAGE_SIZE = 10;
 
 const toKST = (utcStr: string) =>
@@ -17,7 +21,7 @@ const toKST = (utcStr: string) =>
     hour12: false,
   });
 
-const MetricsDashboard: React.FC = () => {
+const MetricsDashboard: React.FC<Props> = ({ serverReady }) => {
   const [summary, setSummary] = useState<MetricsSummary | null>(null);
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
   const [logs, setLogs] = useState<QueryLog[]>([]);
@@ -31,7 +35,7 @@ const MetricsDashboard: React.FC = () => {
     setPage(1);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (serverReady) load(); }, [serverReady]);
 
   const totalPages = Math.max(1, Math.ceil(logs.length / PAGE_SIZE));
   const pagedLogs = logs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
