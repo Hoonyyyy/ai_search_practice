@@ -85,7 +85,7 @@ public class AiServiceClient {
 
     /**
      * 쿼리에 대한 유사 청크를 Qdrant에서 검색해 반환.
-     * 동기 HTTP 호출 (블로킹). 502 시 최대 60초간 재시도.
+     * 동기 HTTP 호출 (블로킹). 502 시 최대 150초간 재시도.
      */
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> searchVectors(String query, int topK) {
@@ -161,17 +161,29 @@ public class AiServiceClient {
 
     /**
      * Qdrant에 실제로 저장돼 있는 doc_id 목록.
-     * H2의 문서 목록과 비교해 잔여 벡터를 찾아내는 데 쓴다.
+     * H2의 문서 목록과 비교해 잔여 벡터를 찾아내는 데 쓴다. 502 시 최대 150초간 재시도.
      */
     @SuppressWarnings("unchecked")
     public List<String> listDocIds() {
         String url = aiServiceUrl + "/ai/documents/doc-ids";
-        ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-        return (List<String>) response.getBody().get("doc_ids");
+
+        for (int attempt = 0; attempt < MAX_RETRY; attempt++) {
+            try {
+                ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+                return (List<String>) response.getBody().get("doc_ids");
+            } catch (HttpServerErrorException e) {
+                if (e.getStatusCode().value() == 502 && attempt < MAX_RETRY - 1) {
+                    waitForRetry(attempt);
+                } else {
+                    throw e;
+                }
+            }
+        }
+        throw new IllegalStateException("unreachable");
     }
 
     /**
-     * Qdrant에서 문서 벡터 삭제. 502 시 최대 60초간 재시도.
+     * Qdrant에서 문서 벡터 삭제. 502 시 최대 150초간 재시도.
      */
     public void deleteVectors(String docId) {
         String url = aiServiceUrl + "/ai/documents/" + docId;
