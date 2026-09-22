@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DocumentInfo } from '../types';
 import { uploadDocument, listDocuments, deleteDocument } from '../api/documents';
+import { wakeAiService } from '../api/server';
 
 export interface UploadProgress {
   done: number;
@@ -20,6 +21,7 @@ export function useUpload() {
   };
 
   const upload = async (file: File) => {
+    wakeAiService();
     setUploading(true);
     setUploadStatus('');
     setUploadProgress(null);
@@ -56,6 +58,7 @@ export function useUpload() {
   };
 
   const remove = async (docId: string) => {
+    wakeAiService();
     await deleteDocument(docId);
     await loadDocs();
   };

@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # (한두 개 문서만 올리는 데모에서 검색 누락을 없앤다)
     full_context_threshold: int = 12
 
+    # ── CORS ──────────────────────────────────────────────────
+    # 브라우저가 /health 를 직접 불러 이 서버를 깨울 수 있게 허용할 출처 (쉼표로 구분).
+    # Render 안의 Spring 이 부르면 502 만 오고 깨어나지 않는다 → 바깥(브라우저)에서 깨워야 한다.
+    cors_allowed_origins: str = "http://localhost:3000,http://localhost:3001"
+
     class Config:
         env_file = ".env"
 
