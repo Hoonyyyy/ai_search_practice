@@ -160,8 +160,12 @@ public class DocumentService {
      * 기록 -> 벡터 순서로 지운다 (업로드의 역순).
      * 중간에 실패하면 "기록 없는 벡터" (잔여 벡터)가 남는데, 이건 기동 시 점검과 /cleanup 으로 잡힌다.
      * 반대 순서면 "벡터 없는 기록"이 남아 감지할 방법이 없다.
+     * @return 지운 문서가 있었으면 true, 처음부터 없었으면 false
      */
-    public void deleteDocument(String docId) {
+    public boolean deleteDocument(String docId) {
+        if (!documentRepository.existsById(docId)) {
+            return false;
+        }
         documentRepository.deleteById(docId);
         try {
             aiServiceClient.deleteVectors(docId);
@@ -169,7 +173,7 @@ public class DocumentService {
             log.warn("문서 기록은 삭제했으나 벡터 삭제 실패 -> 잔여 벡터로 남음 (docId={}). "
                     + "POST /api/documents/cleanup 으로 정리하세요", docId, e);
         }
-
+        return true;
     }
 
     /**

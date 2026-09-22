@@ -4,6 +4,7 @@ import com.ragsearch.dto.document.DocumentDto;
 import com.ragsearch.service.DocumentService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -34,7 +35,10 @@ public class DocumentController {
 
     @DeleteMapping("/{docId}")
     public ResponseEntity<Map<String, String>> deleteDocument(@PathVariable String docId) {
-        documentService.deleteDocument(docId);
+        if (!documentService.deleteDocument(docId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "문서를 찾을 수 없습니다."));
+        }
         return ResponseEntity.ok(Map.of("message", "삭제 완료"));
     }
 
