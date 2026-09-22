@@ -101,4 +101,9 @@
 .error {
   color: #ef4444;
   font-size: 13px;
+  background: #ef44441a;
+  border: 1px solid #ef444455;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0 0;
 }

@@ -20,7 +20,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -30,8 +31,11 @@ public class DocumentService {
 
     private final DocumentRepository documentRepository;
     private final AiServiceClient aiServiceClient;
-    private final ExecutorService sseExecutor;
+    private final ThreadPoolExecutor uploadExecutor;
     private final ObjectMapper objectMapper;
+
+    // 제출됐지만 아직 끝나지 않은 업로드 수 (대기 중 포함). 스레드 상태를 묻지 않고 직접 센다.
+    private final AtomicInteger uploadsInFlight = new AtomicInteger();
 
     @Value("${document.chunk-size:500}")
     private int chunkSize;
@@ -49,105 +53,121 @@ public class DocumentService {
     public SseEmitter upload(MultipartFile file) {
         SseEmitter emitter = new SseEmitter(300_000L);
 
-        sseExecutor.execute(() -> {
+        // 앞에 3개가 이미 있으면 이 업로드는 줄을 선다 — 멈춘 게 아니라 기다리는 중임을 알린다
+        if (uploadsInFlight.incrementAndGet() > uploadExecutor.getMaximumPoolSize()) {
+            sendEventQuietly(emitter, Map.of("stage", "queued", "message", "앞선 업로드가 끝나길 기다리는 중..."));
+        }
 
-            long t0 = System.currentTimeMillis();
-
+        uploadExecutor.execute(() -> {
             try {
-                validateExtension(file.getOriginalFilename());
-
-                // 1. 텍스트 추출
-                sendEvent(emitter, Map.of("stage", "extracting", "message", "텍스트 추출 중..."));
-                String text = extractText(file);
-
-                long tExtract = System.currentTimeMillis();
-
-                if (text.isBlank()) {
-                    sendEvent(emitter, Map.of("stage", "error", "message", "텍스트를 추출할 수 없습니다."));
-                    emitter.complete();
-                    return;
-                }
-
-                // 2. 청크 분할
-                List<String> chunks = splitText(text, chunkSize, chunkOverlap);
-
-                long tSplit = System.currentTimeMillis();
-
-                sendEvent(emitter, Map.of(
-                        "stage", "splitting",
-                        "message", String.format("청크 분할 완료 (%d개)", chunks.size()),
-                        "total_chunks", chunks.size()
-                ));
-
-                // 3. Python AI 서비스로 임베딩 + ChromaDB 저장 (SSE 프록시)
-                String docId = UUID.randomUUID().toString();
-                sendEvent(emitter, Map.of("stage", "embedding", "message", "임베딩 중... (처음 실행 시 30초 정도 소요될 수 있습니다)"));
-                // heartbeat: nginx 버퍼링 방지 및 cold start 대기 중 연결 유지
-                java.util.concurrent.ScheduledExecutorService heartbeatExecutor =
-                        java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
-                heartbeatExecutor.scheduleAtFixedRate(() -> {
-                    try {
-                        emitter.send(SseEmitter.event().comment("heartbeat"));
-                    } catch (Exception ignored) {}
-                }, 5, 5, java.util.concurrent.TimeUnit.SECONDS);
-
-                try {
-                    aiServiceClient.embedAndStore(docId, file.getOriginalFilename(), chunks, emitter);
-                } catch (Exception e) {
-                    cleanupLeftoverVectors(docId);
-                    throw e;
-                } finally {
-                    heartbeatExecutor.shutdownNow();
-                }
-
-                long tEmbed = System.currentTimeMillis();
-
-                // 4. 문서 메타데이터 JPA 저장
-                Document document = Document.builder()
-                        .docId(docId)
-                        .filename(file.getOriginalFilename())
-                        .chunkCount(chunks.size())
-                        .uploadedAt(LocalDateTime.now())
-                        .build();
-                documentRepository.save(document);
-
-                log.info("upload timing -> extract {}ms,  split {}ms, embed {}ms, total {}ms ({} chunks, textLen {}, longest {})",
-                        tExtract - t0,
-                        tSplit - tExtract,
-                        tEmbed - tSplit,
-                        tEmbed - t0,
-                        chunks.size(),
-                        text.length(),
-                        chunks.stream().mapToInt(String::length).max().orElse(0)
-                    );
-
-
-                // 5. 완료 이벤트
-                sendEvent(emitter, Map.of(
-                        "stage", "done",
-                        "doc_id", docId,
-                        "filename", file.getOriginalFilename(),
-                        "chunk_count", chunks.size(),
-                        "uploaded_at", document.getUploadedAt().toString()
-                ));
-                emitter.complete();
-
-            } catch (InvalidUploadException e) {
-                sendEventQuietly(emitter, Map.of("stage", "error", "message", e.getMessage()));
-                emitter.complete();
-            } catch (Exception e) {
-                if (ErrorMessages.isClientGone(e)) {
-                    log.info("사용자가 연결을 끊어 업로드를 취소했습니다");
-                } else {
-                    log.error("업로드 처리 실패", e);
-                    sendEventQuietly(emitter, Map.of("stage", "error", "message", ErrorMessages.forUpload(e)));
-                }
-                emitter.complete();
+                processUpload(file, emitter);
+            } finally {
+                uploadsInFlight.decrementAndGet();
             }
         });
 
         return emitter;
     }
+
+    /** 텍스트 추출 → 청킹 → Python AI 서비스 호출(임베딩/저장) → JPA 저장 */
+    private void processUpload(MultipartFile file, SseEmitter emitter) {
+
+        long t0 = System.currentTimeMillis();
+
+        try {
+            validateExtension(file.getOriginalFilename());
+
+            // 1. 텍스트 추출
+            sendEvent(emitter, Map.of("stage", "extracting", "message", "텍스트 추출 중..."));
+            String text = extractText(file);
+
+            long tExtract = System.currentTimeMillis();
+
+            if (text.isBlank()) {
+                sendEvent(emitter, Map.of("stage", "error", "message", "텍스트를 추출할 수 없습니다."));
+                emitter.complete();
+                return;
+            }
+
+            // 2. 청크 분할
+            List<String> chunks = splitText(text, chunkSize, chunkOverlap);
+
+            long tSplit = System.currentTimeMillis();
+
+            sendEvent(emitter, Map.of(
+                    "stage", "splitting",
+                    "message", String.format("청크 분할 완료 (%d개)", chunks.size()),
+                    "total_chunks", chunks.size()
+            ));
+
+            // 3. Python AI 서비스로 임베딩 + ChromaDB 저장 (SSE 프록시)
+            String docId = UUID.randomUUID().toString();
+            sendEvent(emitter, Map.of("stage", "embedding", "message", "임베딩 중... (처음 실행 시 30초 정도 소요될 수 있습니다)"));
+            // heartbeat: nginx 버퍼링 방지 및 cold start 대기 중 연결 유지
+            java.util.concurrent.ScheduledExecutorService heartbeatExecutor =
+                    java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+            heartbeatExecutor.scheduleAtFixedRate(() -> {
+                try {
+                    emitter.send(SseEmitter.event().comment("heartbeat"));
+                } catch (Exception ignored) {}
+            }, 5, 5, java.util.concurrent.TimeUnit.SECONDS);
+
+            try {
+                aiServiceClient.embedAndStore(docId, file.getOriginalFilename(), chunks, emitter);
+            } catch (Exception e) {
+                cleanupLeftoverVectors(docId);
+                throw e;
+            } finally {
+                heartbeatExecutor.shutdownNow();
+            }
+
+            long tEmbed = System.currentTimeMillis();
+
+            // 4. 문서 메타데이터 JPA 저장
+            Document document = Document.builder()
+                    .docId(docId)
+                    .filename(file.getOriginalFilename())
+                    .chunkCount(chunks.size())
+                    .uploadedAt(LocalDateTime.now())
+                    .build();
+            documentRepository.save(document);
+
+            log.info("upload timing -> extract {}ms,  split {}ms, embed {}ms, total {}ms ({} chunks, textLen {}, longest {})",
+                    tExtract - t0,
+                    tSplit - tExtract,
+                    tEmbed - tSplit,
+                    tEmbed - t0,
+                    chunks.size(),
+                    text.length(),
+                    chunks.stream().mapToInt(String::length).max().orElse(0)
+                );
+
+
+            // 5. 완료 이벤트
+            sendEvent(emitter, Map.of(
+                    "stage", "done",
+                    "doc_id", docId,
+                    "filename", file.getOriginalFilename(),
+                    "chunk_count", chunks.size(),
+                    "uploaded_at", document.getUploadedAt().toString()
+            ));
+            emitter.complete();
+
+        } catch (InvalidUploadException e) {
+            sendEventQuietly(emitter, Map.of("stage", "error", "message", e.getMessage()));
+            emitter.complete();
+        } catch (Exception e) {
+            if (ErrorMessages.isClientGone(e)) {
+                log.info("사용자가 연결을 끊어 업로드를 취소했습니다");
+            } else {
+                log.error("업로드 처리 실패", e);
+                sendEventQuietly(emitter, Map.of("stage", "error", "message", ErrorMessages.forUpload(e)));
+            }
+            emitter.complete();
+        }
+    }
+
+
 
     public List<DocumentDto> listDocuments() {
         return documentRepository.findAllByOrderByUploadedAtDesc()

@@ -2,6 +2,10 @@ import { DocumentInfo } from '../types';
 
 const BASE = process.env.REACT_APP_API_URL ?? 'http://localhost:8080/api';
 
+// 백엔드 application.yml 의 max-file-size 와 같아야 한다.
+// 브라우저 검사는 친절함(보내기 전에 바로 알림), 진짜 방어는 서버(누구나 우회 가능하니까).
+export const MAX_UPLOAD_MB = 10;
+
 export interface UploadCallbacks {
   onStage: (message: string, done?: number, total?: number) => void;
   onDone: (doc: DocumentInfo) => void;
@@ -13,6 +17,14 @@ export const uploadDocument = async (file: File, callbacks: UploadCallbacks): Pr
   form.append('file', file);
 
   const resp = await fetch(`${BASE}/documents/upload`, { method: 'POST', body: form });
+
+  // 서버가 거절하면(413 등) 본문이 SSE 가 아니다. 여기서 끝내지 않으면 화면이 "업로드 중..." 에서 멈춘다.
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null);
+    callbacks.onError(body?.message ?? '업로드에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    return;
+  }
+
   const reader = resp.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
