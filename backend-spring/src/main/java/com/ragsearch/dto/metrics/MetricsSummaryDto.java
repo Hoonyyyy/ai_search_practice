@@ -7,7 +7,6 @@ import lombok.Getter;
 @AllArgsConstructor
 public class MetricsSummaryDto {
     private final long totalQueries;
-    private final double avgResponseTimeMs;
+    private final double medianResponseTimeMs;
     private final long totalTokensUsed;
-    private final Double avgUserScore;
 }

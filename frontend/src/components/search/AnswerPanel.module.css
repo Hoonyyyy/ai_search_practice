@@ -98,26 +98,6 @@
 }
 
 /* 피드백 */
-.feedback {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
 
-.feedbackLabel {
-  color: #888;
-  font-size: 13px;
-}
 
-.feedbackDone {
-  color: #10b981;
-  font-size: 13px;
-}
 
-.starBtn {
-  background: transparent;
-  border: none;
-  font-size: 22px;
-  cursor: pointer;
-  transition: opacity 0.1s;
-}

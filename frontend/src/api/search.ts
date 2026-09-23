@@ -49,10 +49,3 @@ export const queryStream = async (question: string, topK = 4, callbacks: StreamC
   }
 };
 
-export const sendFeedback = async (queryId: string, score: number): Promise<void> => {
-  await fetch(`${BASE}/search/feedback`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...sessionHeader() },
-    body: JSON.stringify({ query_id: queryId, score }),
-  });
-};

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { QueryResponse, SourceChunk } from '../../types';
-import { sendFeedback } from '../../api/search';
 import styles from './AnswerPanel.module.css';
 
 interface MetricBadge {
@@ -18,9 +17,6 @@ interface Props {
 }
 
 const AnswerPanel: React.FC<Props> = ({ streamText, sources, result, streaming }) => {
-  const [score, setScore] = useState<number | null>(null);
-  const [sent, setSent] = useState(false);
-
   const hasContent = streamText || streaming;
 
   if (!hasContent && !result) {
@@ -28,13 +24,6 @@ const AnswerPanel: React.FC<Props> = ({ streamText, sources, result, streaming }
   }
 
   const m = result?.metrics;
-
-  const handleScore = async (s: number) => {
-    if (!m?.query_id) return;
-    setScore(s);
-    await sendFeedback(m.query_id, s);
-    setSent(true);
-  };
 
   const badges: MetricBadge[] = m && m.response_time_ms > 0 ? [
     { label: '응답시간', value: `${m.response_time_ms}ms`, color: '#10b981', borderColor: '#10b98144' },
@@ -79,23 +68,6 @@ const AnswerPanel: React.FC<Props> = ({ streamText, sources, result, streaming }
         </div>
       )}
 
-      {!streaming && streamText && (
-        <div className={styles.feedback}>
-          <span className={styles.feedbackLabel}>답변이 도움이 됐나요?</span>
-          {sent ? (
-            <span className={styles.feedbackDone}>감사합니다! ({score}점)</span>
-          ) : (
-            [1, 2, 3, 4, 5].map((s) => (
-              <button
-                key={s}
-                className={styles.starBtn}
-                onClick={() => handleScore(s)}
-                style={{ opacity: score && score >= s ? 1 : 0.4 }}
-              >★</button>
-            ))
-          )}
-        </div>
-      )}
     </div>
   );
 };

@@ -29,16 +29,14 @@ export interface QueryResponse {
 
 export interface MetricsSummary {
   total_queries: number;
-  avg_response_time_ms: number;
+  median_response_time_ms: number;
   total_tokens_used: number;
-  avg_user_score: number | null;
 }
 
 export interface TimelinePoint {
   timestamp: string;
   response_time_ms: number;
   total_tokens: number;
-  user_score: number | null;
 }
 
 export interface QueryLog {
@@ -48,5 +46,4 @@ export interface QueryLog {
   answer: string;
   response_time_ms: number;
   total_tokens: number;
-  user_score: number | null;
 }
