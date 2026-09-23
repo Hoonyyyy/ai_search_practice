@@ -43,8 +43,6 @@ public class QueryLog {
     @Column(name = "retrieved_chunks")
     private int retrievedChunks;
 
-    @Column(name = "user_score")
-    private Double userScore;
 
     /**
      * 이 질문을 던진 익명 세션 id (문서의 owner 와 같은 값).
@@ -69,7 +67,4 @@ public class QueryLog {
         this.owner = owner;
     }
 
-    public void updateScore(double score) {
-        this.userScore = score;
-    }
 }

@@ -132,13 +132,6 @@ public class SearchService {
 
 
 
-    public void saveFeedback(String queryId, double score) {
-        queryLogRepository.findById(queryId).ifPresent(log -> {
-            log.updateScore(score);
-            queryLogRepository.save(log);
-        });
-    }
-
     @SuppressWarnings("unchecked")
     private Map<String, Object> toMap(Object o) {
         return (Map<String, Object>) o;

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import StatCard from './StatCard';
 import ResponseTimeChart from './charts/ResponseTimeChart';
 import TokenUsageChart from './charts/TokenUsageChart';
-import ScoreChart from './charts/ScoreChart';
 import { getMetricsSummary, getTimeline, getRecentLogs } from '../../api/metrics';
 import { MetricsSummary, TimelinePoint, QueryLog } from '../../types';
 import styles from './MetricsDashboard.module.css';
@@ -50,15 +49,13 @@ const MetricsDashboard: React.FC<Props> = ({ serverReady }) => {
       {summary && (
         <div className={styles.statRow}>
           <StatCard label="총 쿼리 수" value={summary.total_queries.toLocaleString()} color="#6366f1" />
-          <StatCard label="평균 응답시간" value={`${summary.avg_response_time_ms}ms`} color="#10b981" />
+          <StatCard label="응답시간 중앙값 (최근 20건)" value={`${summary.median_response_time_ms}ms`} color="#10b981" />
           <StatCard label="총 토큰 사용" value={summary.total_tokens_used.toLocaleString()} color="#f59e0b" sub="tokens" />
-          <StatCard label="평균 평가 점수" value={summary.avg_user_score ? `${summary.avg_user_score} / 5` : '-'} color="#a78bfa" />
         </div>
       )}
 
       <ResponseTimeChart data={timeline} />
       <TokenUsageChart data={timeline} />
-      <ScoreChart data={timeline} />
 
       {logs.length > 0 && (
         <div>
@@ -84,7 +81,6 @@ const MetricsDashboard: React.FC<Props> = ({ serverReady }) => {
                 <div className={styles.logMeta}>
                   <span className={styles.logMetaTime}>{log.response_time_ms}ms</span>
                   <span className={styles.logMetaTokens}>{log.total_tokens} tokens</span>
-                  {log.user_score && <span className={styles.logMetaScore}>★ {log.user_score}</span>}
                 </div>
               </div>
             ))}

@@ -1,5 +1,6 @@
 package com.ragsearch.service;
 
+import com.ragsearch.domain.QueryLog;
 import com.ragsearch.dto.metrics.MetricsSummaryDto;
 import com.ragsearch.dto.metrics.QueryLogDto;
 import com.ragsearch.dto.metrics.TimelinePointDto;
@@ -15,13 +16,37 @@ public class MetricsService {
 
     private final QueryLogRepository queryLogRepository;
 
+    /**
+     * 평균 응답시간은 전체가 아니라 최근 이만큼만 본다.
+     * 전체 평균은 IPv6 문제를 고치기 전 기록(4,485ms 시절)과 콜드 스타트까지 섞여 있어
+     * 지금 상태를 나타내지 못한다. 숨길 게 아니라 숫자를 의미 있게 만든다.
+     */
+    private static final int RECENT_WINDOW = 20;
+
     public MetricsSummaryDto getSummary() {
+        int[] recentMs = queryLogRepository.findTop100ByOrderByTimestampDesc()
+                .stream()
+                .limit(RECENT_WINDOW)
+                .mapToInt(QueryLog::getResponseTimeMs)
+                .sorted()
+                .toArray();
+
         return new MetricsSummaryDto(
                 queryLogRepository.countAll(),
-                Math.round(queryLogRepository.avgResponseTimeMs() * 10.0) / 10.0,
-                queryLogRepository.sumTotalTokens(),
-                queryLogRepository.avgUserScore()
+                median(recentMs),
+                queryLogRepository.sumTotalTokens()
         );
+    }
+
+    /** 정렬된 배열의 중앙값. 빈 배열이면 0. */
+    private static double median(int[] sorted) {
+        if (sorted.length == 0) {
+            return 0;
+        }
+        int mid = sorted.length / 2;
+        return sorted.length % 2 == 1
+                ? sorted[mid]
+                : (sorted[mid - 1] + sorted[mid]) / 2.0;
     }
 
     /** 최신 100건을 시간 오름차순으로 반환 (차트용) */

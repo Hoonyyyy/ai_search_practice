@@ -13,7 +13,6 @@ public class QueryLogDto {
     private final String answer;
     private final int responseTimeMs;
     private final int totalTokens;
-    private final Double userScore;
 
     private QueryLogDto(QueryLog log) {
         this.id = log.getId();
@@ -22,7 +21,6 @@ public class QueryLogDto {
         this.answer = log.getAnswer();
         this.responseTimeMs = log.getResponseTimeMs();
         this.totalTokens = log.getTotalTokens();
-        this.userScore = log.getUserScore();
     }
 
     public static QueryLogDto from(QueryLog log) {
