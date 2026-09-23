@@ -12,6 +12,9 @@ public interface QueryLogRepository extends JpaRepository<QueryLog, String> {
 
     List<QueryLog> findTop100ByOrderByTimestampDesc();
 
+    /** 한 세션이 던진 질문만 (통계 쿼리들은 전체를 그대로 본다) */
+    List<QueryLog> findTop100ByOwnerOrderByTimestampDesc(String owner);
+
     @Query("SELECT COUNT(q) FROM QueryLog q")
     long countAll();
 

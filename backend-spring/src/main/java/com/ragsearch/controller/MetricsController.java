@@ -27,7 +27,9 @@ public class MetricsController {
     }
 
     @GetMapping("/recent")
-    public List<QueryLogDto> recent(@RequestParam(defaultValue = "20") int limit) {
-        return metricsService.getRecentLogs(limit);
+    public List<QueryLogDto> recent(
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return metricsService.getRecentLogs(limit, sessionId);
     }
 }

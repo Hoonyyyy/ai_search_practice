@@ -46,10 +46,17 @@ public class QueryLog {
     @Column(name = "user_score")
     private Double userScore;
 
+    /**
+     * 이 질문을 던진 익명 세션 id (문서의 owner 와 같은 값).
+     * 통계는 전부 합쳐서 보여주지만, 질문 내용은 자기 것만 보이게 하려고 남긴다.
+     */
+    @Column(name = "owner")
+    private String owner;
+
     @Builder
     public QueryLog(String id, LocalDateTime timestamp, String question, String answer,
                     int responseTimeMs, int inputTokens, int outputTokens,
-                    int totalTokens, int retrievedChunks) {
+                    int totalTokens, int retrievedChunks, String owner) {
         this.id = id;
         this.timestamp = timestamp;
         this.question = question;
@@ -59,6 +66,7 @@ public class QueryLog {
         this.outputTokens = outputTokens;
         this.totalTokens = totalTokens;
         this.retrievedChunks = retrievedChunks;
+        this.owner = owner;
     }
 
     public void updateScore(double score) {
