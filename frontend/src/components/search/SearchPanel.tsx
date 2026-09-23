@@ -14,7 +14,7 @@ interface Props {
 }
 
 const SearchPanel: React.FC<Props> = ({ serverReady, onSearch, question, onQuestionChange, searching, searchError }) => {
-  const { docs, uploading, uploadStatus, uploadProgress, error: uploadError, loadDocs, upload, remove } = useUpload();
+  const { docs, uploading, uploadStatus, uploadProgress, error: uploadError, loadDocs, upload, remove, removingId } = useUpload();
 
   useEffect(() => { if (serverReady) loadDocs(); }, [serverReady]);
 
@@ -44,8 +44,12 @@ const SearchPanel: React.FC<Props> = ({ serverReady, onSearch, question, onQuest
                   <span className={styles.docName}>{doc.filename}</span>
                   <span className={styles.docMeta}>{doc.chunk_count} 청크</span>
                 </div>
-                <button className={styles.deleteBtn} onClick={() => remove(doc.doc_id)}>
-                  삭제
+                <button
+                  className={styles.deleteBtn}
+                  onClick={() => remove(doc.doc_id)}
+                  disabled={removingId === doc.doc_id}
+                >
+                  {removingId === doc.doc_id ? '삭제 중...' : '삭제'}
                 </button>
               </div>
             ))}
