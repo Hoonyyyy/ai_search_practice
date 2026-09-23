@@ -1,4 +1,5 @@
 import { DocumentInfo } from '../types';
+import { sessionHeader } from './session';
 
 const BASE = process.env.REACT_APP_API_URL ?? 'http://localhost:8080/api';
 
@@ -16,7 +17,7 @@ export const uploadDocument = async (file: File, callbacks: UploadCallbacks): Pr
   const form = new FormData();
   form.append('file', file);
 
-  const resp = await fetch(`${BASE}/documents/upload`, { method: 'POST', body: form });
+  const resp = await fetch(`${BASE}/documents/upload`, { method: 'POST', headers: sessionHeader(), body: form });
 
   // 서버가 거절하면(413 등) 본문이 SSE 가 아니다. 여기서 끝내지 않으면 화면이 "업로드 중..." 에서 멈춘다.
   if (!resp.ok) {
@@ -56,10 +57,19 @@ export const uploadDocument = async (file: File, callbacks: UploadCallbacks): Pr
 };
 
 export const listDocuments = async (): Promise<DocumentInfo[]> => {
-  const resp = await fetch(`${BASE}/documents`);
+  const resp = await fetch(`${BASE}/documents`, {headers: sessionHeader() });
   return resp.json();
 };
 
 export const deleteDocument = async (docId: string): Promise<void> => {
-  await fetch(`${BASE}/documents/${docId}`, { method: 'DELETE' });
+  const resp = await fetch(`${BASE}/documents/${docId}`, {
+    method: 'DELETE',
+    headers: sessionHeader(),
+  });
+
+  // 서버가 거절한 이유(403 예시 문서 / 404 없음)를 화면까지 올려보낸다
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => null);
+    throw new Error(body?.message ?? '삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
 };

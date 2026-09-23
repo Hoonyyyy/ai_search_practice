@@ -1,4 +1,5 @@
 import { SourceChunk, QueryMetrics } from '../types';
+import { sessionHeader } from './session';
 
 const BASE = process.env.REACT_APP_API_URL ?? 'http://localhost:8080/api';
 
@@ -12,7 +13,7 @@ export interface StreamCallbacks {
 export const queryStream = async (question: string, topK = 4, callbacks: StreamCallbacks): Promise<void> => {
   const resp = await fetch(`${BASE}/search/query`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...sessionHeader() },
     body: JSON.stringify({ question, top_k: topK }),
   });
 
@@ -51,7 +52,7 @@ export const queryStream = async (question: string, topK = 4, callbacks: StreamC
 export const sendFeedback = async (queryId: string, score: number): Promise<void> => {
   await fetch(`${BASE}/search/feedback`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...sessionHeader() },
     body: JSON.stringify({ query_id: queryId, score }),
   });
 };

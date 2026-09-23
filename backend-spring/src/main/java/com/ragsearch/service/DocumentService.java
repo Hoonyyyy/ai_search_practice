@@ -46,12 +46,24 @@ public class DocumentService {
     @Value("${document.allowed-extensions:.pdf,.txt,.md}")
     private String allowedExtensions;
 
+    /** 삭제 요청의 결과. 컨트롤러가 상태 코드를 고르는 근거가 된다. */
+    public enum DeleteResult { DELETED, NOT_FOUND, SAMPLE_PROTECTED }
+
     /**
      * 파일 업로드 처리 후 SSE로 진행 상황 전송.
      * 텍스트 추출 → 청킹 → Python AI 서비스 호출(임베딩/저장) → JPA 저장
      */
-    public SseEmitter upload(MultipartFile file) {
+    public SseEmitter upload(MultipartFile file, String sessionId) {
         SseEmitter emitter = new SseEmitter(300_000L);
+
+        // 세션 없는 업로드를 허용하면 owner 가 NULL 로 저장된다 = "예시 문서"가 돼버리고,
+        // 예시 문서는 아무도 지울 수 없다(아래 deleteDocument 참고). 그래서 여기서 막는다.
+        if (sessionId == null || sessionId.isBlank()) {
+            sendEventQuietly(emitter, Map.of("stage", "error",
+                    "message", "세션 정보가 없습니다. 새로고침 후 다시 시도해 주세요."));
+            emitter.complete();
+            return emitter;
+        }
 
         // 앞에 3개가 이미 있으면 이 업로드는 줄을 선다 — 멈춘 게 아니라 기다리는 중임을 알린다
         if (uploadsInFlight.incrementAndGet() > uploadExecutor.getMaximumPoolSize()) {
@@ -60,7 +72,7 @@ public class DocumentService {
 
         uploadExecutor.execute(() -> {
             try {
-                processUpload(file, emitter);
+                processUpload(file, sessionId, emitter);
             } finally {
                 uploadsInFlight.decrementAndGet();
             }
@@ -70,7 +82,7 @@ public class DocumentService {
     }
 
     /** 텍스트 추출 → 청킹 → Python AI 서비스 호출(임베딩/저장) → JPA 저장 */
-    private void processUpload(MultipartFile file, SseEmitter emitter) {
+    private void processUpload(MultipartFile file, String sessionId, SseEmitter emitter) {
 
         long t0 = System.currentTimeMillis();
 
@@ -113,7 +125,7 @@ public class DocumentService {
             }, 5, 5, java.util.concurrent.TimeUnit.SECONDS);
 
             try {
-                aiServiceClient.embedAndStore(docId, file.getOriginalFilename(), chunks, emitter);
+                aiServiceClient.embedAndStore(docId, file.getOriginalFilename(), chunks, sessionId, emitter);
             } catch (Exception e) {
                 cleanupLeftoverVectors(docId);
                 throw e;
@@ -129,6 +141,7 @@ public class DocumentService {
                     .filename(file.getOriginalFilename())
                     .chunkCount(chunks.size())
                     .uploadedAt(LocalDateTime.now())
+                    .owner(sessionId)
                     .build();
             documentRepository.save(document);
 
@@ -168,24 +181,48 @@ public class DocumentService {
     }
 
 
+    /**
+     * 이 세션이 올린 문서를 보여준다. 없으면 예시 문서를 대신 보여준다 —
+     * 아무것도 올리지 않은 방문자도 바로 검색을 시험해볼 수 있게.
+     * 헤더가 없는 요청(keep-alive 핑 등)도 에러 없이 예시 문서를 받는다.
+     *
+     * @param sessionId 익명 세션 id. 없으면 null
+     * @return 화면에 보여줄 문서 목록
+     */
+    public List<DocumentDto> listDocuments(String sessionId) {
+        List<Document> mine = sessionId == null
+                ? List.of()
+                : documentRepository.findAllByOwnerOrderByUploadedAtDesc(sessionId);
 
-    public List<DocumentDto> listDocuments() {
-        return documentRepository.findAllByOrderByUploadedAtDesc()
-                .stream()
-                .map(DocumentDto::from)
-                .toList();
+        List<Document> visible = mine.isEmpty()
+                ? documentRepository.findAllByOwnerIsNullOrderByUploadedAtDesc()
+                : mine;
+
+        return visible.stream().map(DocumentDto::from).toList();
     }
 
     /**
      * 기록 -> 벡터 순서로 지운다 (업로드의 역순).
      * 중간에 실패하면 "기록 없는 벡터" (잔여 벡터)가 남는데, 이건 기동 시 점검과 /cleanup 으로 잡힌다.
      * 반대 순서면 "벡터 없는 기록"이 남아 감지할 방법이 없다.
-     * @return 지운 문서가 있었으면 true, 처음부터 없었으면 false
+     *
+     * @param docId 지울 문서 id
+     * @param sessionId 요청한 익명 세션 id. 없으면 null
+     * @return 삭제 결과 (지움 / 없음 / 예시 문서라 보호됨)
      */
-    public boolean deleteDocument(String docId) {
-        if (!documentRepository.existsById(docId)) {
-            return false;
+    public DeleteResult deleteDocument(String docId, String sessionId) {
+        Document document = documentRepository.findById(docId).orElse(null);
+        if (document == null) {
+            return DeleteResult.NOT_FOUND;
         }
+        if (document.getOwner() == null) {
+            return DeleteResult.SAMPLE_PROTECTED;   // 예시 문서는 누구도 지울 수 없다
+        }
+        if (!document.getOwner().equals(sessionId)) {
+            // 남의 문서다. 403 이 아니라 404 를 준다 — 그 id 의 문서가 있다는 사실조차 알려줄 이유가 없다.
+            return DeleteResult.NOT_FOUND;
+        }
+
         documentRepository.deleteById(docId);
         try {
             aiServiceClient.deleteVectors(docId);
@@ -193,7 +230,7 @@ public class DocumentService {
             log.warn("문서 기록은 삭제했으나 벡터 삭제 실패 -> 잔여 벡터로 남음 (docId={}). "
                     + "POST /api/documents/cleanup 으로 정리하세요", docId, e);
         }
-        return true;
+        return DeleteResult.DELETED;
     }
 
     /**
@@ -250,7 +287,7 @@ public class DocumentService {
         } catch (Exception cleanupError) {
             log.error("잔여 벡터 정리 실패 (docId={})", docId, cleanupError);
         }
-    }      
+    }
 
     private void validateExtension(String filename) {
         if (filename == null) throw new InvalidUploadException("파일명이 없습니다.");

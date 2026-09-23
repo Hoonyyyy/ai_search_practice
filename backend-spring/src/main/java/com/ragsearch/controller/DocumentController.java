@@ -2,6 +2,7 @@ package com.ragsearch.controller;
 
 import com.ragsearch.dto.document.DocumentDto;
 import com.ragsearch.service.DocumentService;
+import com.ragsearch.service.DocumentService.DeleteResult;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,24 +23,31 @@ public class DocumentController {
     private final DocumentService documentService;
 
     @PostMapping(value = "/upload", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter upload(@RequestParam("file") MultipartFile file, HttpServletResponse response) {
+    public SseEmitter upload(@RequestParam("file") MultipartFile file,
+                             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+                             HttpServletResponse response) {
         response.setHeader("X-Accel-Buffering", "no");
         response.setHeader("Cache-Control", "no-cache");
-        return documentService.upload(file);
+        return documentService.upload(file, sessionId);
     }
 
     @GetMapping
-    public List<DocumentDto> listDocuments() {
-        return documentService.listDocuments();
+    public List<DocumentDto> listDocuments(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return documentService.listDocuments(sessionId);
     }
 
     @DeleteMapping("/{docId}")
-    public ResponseEntity<Map<String, String>> deleteDocument(@PathVariable String docId) {
-        if (!documentService.deleteDocument(docId)) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+    public ResponseEntity<Map<String, String>> deleteDocument(
+            @PathVariable String docId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return switch (documentService.deleteDocument(docId, sessionId)) {
+            case DELETED -> ResponseEntity.ok(Map.of("message", "삭제 완료"));
+            case SAMPLE_PROTECTED -> ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "예시 문서는 삭제할 수 없습니다."));
+            case NOT_FOUND -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "문서를 찾을 수 없습니다."));
-        }
-        return ResponseEntity.ok(Map.of("message", "삭제 완료"));
+        };
     }
 
     /** 잔여 벡터 조회 - 삭제하지 않고 보기만 한다 */

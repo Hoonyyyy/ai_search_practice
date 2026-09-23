@@ -65,8 +65,16 @@ export function useUpload() {
 
   const remove = async (docId: string) => {
     wakeAiService();
-    await deleteDocument(docId);
-    await loadDocs();
+    setError('');
+
+    try {
+      await deleteDocument(docId);
+    } catch (e) {
+      // 실패를 삼키면 "지웠는데 다시 나타나는" 유령 버그가 된다
+      setError(e instanceof Error ? e.message : '삭제하지 못했어요.');
+    }
+
+    await loadDocs();   // 성공이든 실패든 서버 상태에 화면을 맞춘다
   };
 
   return { docs, uploading, uploadStatus, uploadProgress, error, setError, loadDocs, upload, remove };
