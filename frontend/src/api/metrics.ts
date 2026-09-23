@@ -1,4 +1,5 @@
 import { MetricsSummary, TimelinePoint, QueryLog } from '../types';
+import { sessionHeader } from './session';
 
 const BASE = process.env.REACT_APP_API_URL ?? 'http://localhost:8080/api';
 
@@ -13,6 +14,6 @@ export const getTimeline = async (limit = 50): Promise<TimelinePoint[]> => {
 };
 
 export const getRecentLogs = async (limit = 20): Promise<QueryLog[]> => {
-  const resp = await fetch(`${BASE}/metrics/recent?limit=${limit}`);
+  const resp = await fetch(`${BASE}/metrics/recent?limit=${limit}`, { headers: sessionHeader() });
   return resp.json();
 };

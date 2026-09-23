@@ -102,6 +102,7 @@ public class SearchService {
                         .outputTokens(result.outputTokens())
                         .totalTokens(result.inputTokens() + result.outputTokens())
                         .retrievedChunks(chunks.size())
+                        .owner(sessionId)
                         .build());
 
                 // 5. 완료 이벤트

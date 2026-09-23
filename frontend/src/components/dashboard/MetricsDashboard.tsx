@@ -64,7 +64,7 @@ const MetricsDashboard: React.FC<Props> = ({ serverReady }) => {
         <div>
           <div className={styles.logHeader}>
             <h3 className={styles.logTitle}>
-              쿼리 로그 <span className={styles.logCount}>({logs.length}건)</span>
+              내 질문 <span className={styles.logCount}>({logs.length}건)</span>
             </h3>
             <div className={styles.pagination}>
               <button className={styles.pageBtn} onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>이전</button>
@@ -90,6 +90,11 @@ const MetricsDashboard: React.FC<Props> = ({ serverReady }) => {
             ))}
           </div>
         </div>
+      )}
+      {logs.length === 0 && (
+        <p className={styles.emptyLogs}>
+          위 숫자는 모든 방문자의 합계예요. 질문 내용은 본인 것만 보입니다 — 검색을 해보시면 여기에 쌓입니다.
+        </p>
       )}
     </div>
   );
