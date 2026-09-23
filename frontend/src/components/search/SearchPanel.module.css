@@ -50,7 +50,12 @@
   transition: background 0.15s;
 }
 
-.deleteBtn:hover {
+.deleteBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.deleteBtn:hover:not(:disabled) {
   background: #ef444420;
 }
 

@@ -10,6 +10,7 @@ export interface UploadProgress {
 
 export function useUpload() {
   const [docs, setDocs] = useState<DocumentInfo[]>([]);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
@@ -75,6 +76,7 @@ export function useUpload() {
   const remove = async (docId: string) => {
     wakeAiService();
     setError('');
+    setRemovingId(docId);   // 어느 문서를 지우는 중인지 기억한다 (문서가 여럿일 때를 위해)
 
     try {
       await deleteDocument(docId);
@@ -83,8 +85,9 @@ export function useUpload() {
       setError(e instanceof Error ? e.message : '삭제하지 못했어요.');
     }
 
-    await loadDocs();   // 성공이든 실패든 서버 상태에 화면을 맞춘다
+    await loadDocs();       // 성공이든 실패든 서버 상태에 화면을 맞춘다
+    setRemovingId(null);
   };
 
-  return { docs, uploading, uploadStatus, uploadProgress, error, setError, loadDocs, upload, remove };
+  return { docs, uploading, uploadStatus, uploadProgress, error, setError, loadDocs, upload, remove, removingId };
 }
