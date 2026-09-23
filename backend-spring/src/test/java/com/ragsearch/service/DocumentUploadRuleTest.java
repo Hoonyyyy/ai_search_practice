@@ -99,9 +99,10 @@ class DocumentUploadRuleTest {
 
         documentService.upload(textFile(("두번째.txt")), SESSION);
         //새 문서를 저장한 뒤에 옛 문서를 지우므로, 잠깐 2개가 공존할 수 있다
-        waitUntil(() -> myDocuments().size() == 1
-                        && "두번째.txt".equals(myDocuments().get(0).getFilename()),
-                        "옛 문서 교체");
+        waitUntil(() -> {
+            List<Document> mine = myDocuments();      // 한 번만 묻는다
+            return mine.size() == 1 && "두번째.txt".equals(mine.get(0).getFilename());
+        }, "옛 문서 교체");
 
 
         assertThat(documentRepository.existsById(firstDocId)).isFalse();
