@@ -12,8 +12,12 @@ export function useSearch() {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState('');
 
-  const search = async () => {
-    if (!question.trim() || searching) return;
+  // 칩을 누르면 입력창 상태가 갱신되기 전에 검색이 시작될 수 있다.
+  // 그래서 질문을 직접 받을 수 있게 열어둔다 (없으면 기존처럼 입력창 값을 쓴다).
+  const search = async (override?: string) => {
+    const q = (override ?? question).trim();
+    if (!q || searching) return;
+    if (override) setQuestion(override);
 
     wakeAiService();
     setSearching(true);
@@ -24,7 +28,7 @@ export function useSearch() {
     setError('');
 
     try {
-      await queryStream(question, 4, {
+      await queryStream(q, 4, {
         onMeta: (queryId, srcs) => setSources(srcs),
         onToken: (token) => setStreamText((prev) => prev + token),
         onError: (msg) => setError(msg),

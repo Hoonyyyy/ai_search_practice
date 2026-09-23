@@ -1,0 +1,33 @@
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.label {
+  color: #777;
+  font-size: 12px;
+}
+
+.chip {
+  background: #1e1e2e;
+  border: 1px solid #444;
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: #bbb;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: #6366f1;
+  color: #e0e0e0;
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
