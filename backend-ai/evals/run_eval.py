@@ -18,6 +18,8 @@ from pathlib import Path
 
 import requests
 
+from eval_session import EVAL_OWNER
+
 BASE = Path(__file__).parent
 AI_URL = "http://127.0.0.1:8001"
 
@@ -36,7 +38,7 @@ def normalize(text: str) -> str:
 def search(question: str, top_k: int):
     resp = requests.post(
         f"{AI_URL}/ai/search",
-        json={"query": question, "top_k": top_k},
+        json={"query": question, "top_k": top_k, "owner": EVAL_OWNER},
         timeout=180,
     )
     resp.raise_for_status()
@@ -101,7 +103,7 @@ def main():
     print(f"문서 적중@{k}  : {doc_hits}/{n}  ({doc_hits / n * 100:.1f}%)")
 
     print(f"MRR@{k}   : {rr_sum / n:.3f}")
-    
+
 
     print(f"평균 검색 시간 : {total_ms / n:.0f}ms\n")
 

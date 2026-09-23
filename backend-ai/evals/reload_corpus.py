@@ -18,19 +18,22 @@ from pathlib import Path
 
 import requests
 
+from eval_session import EVAL_OWNER
+
 SPRING = "http://127.0.0.1:8080"
+HEADERS = {"X-Session-Id": EVAL_OWNER}  # 익명 세션 도입 후 업로드·목록·삭제가 이걸 요구한다
 CORPUS_DIR = Path(r"C:\Users\onsyg\Desktop\예시pdf")
 FILES = ["Galaxybook_guide.pdf", "사람인_이력서_강현수.pdf"]
 
 
 def list_documents():
-    return requests.get(f"{SPRING}/api/documents", timeout=30).json()
+    return requests.get(f"{SPRING}/api/documents", headers=HEADERS, timeout=30).json()
 
 
 def delete_all():
     docs = list_documents()
     for d in docs:
-        requests.delete(f"{SPRING}/api/documents/{d['doc_id']}", timeout=60)
+        requests.delete(f"{SPRING}/api/documents/{d['doc_id']}", headers=HEADERS, timeout=60)
         print(f"  삭제: {d['filename']} ({d['chunk_count']}청크)")
     return len(docs)
 
@@ -42,6 +45,7 @@ def upload(path: Path):
         resp = requests.post(
             f"{SPRING}/api/documents/upload",
             files={"file": (path.name, fh, "application/pdf")},
+            headers=HEADERS,
             stream=True,
             timeout=900,
         )

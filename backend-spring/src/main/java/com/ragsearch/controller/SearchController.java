@@ -21,10 +21,12 @@ public class SearchController {
     private final SearchService searchService;
 
     @PostMapping(value = "/query", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter query(@RequestBody @Valid QueryRequestDto request, HttpServletResponse response) {
+    public SseEmitter query(@RequestBody @Valid QueryRequestDto request,
+                            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+                            HttpServletResponse response) {
         response.setHeader("X-Accel-Buffering", "no");
         response.setHeader("Cache-Control", "no-cache");
-        return searchService.query(request.getQuestion(), request.getTopK());
+        return searchService.query(request.getQuestion(), request.getTopK(), sessionId);
     }
 
     @PostMapping("/feedback")

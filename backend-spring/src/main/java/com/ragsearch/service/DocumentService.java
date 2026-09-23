@@ -202,6 +202,20 @@ public class DocumentService {
     }
 
     /**
+     * 검색 범위로 쓸 소유자를 정한다. 목록(listDocuments)과 같은 규칙이어야 한다 —
+     * 화면에 보이는 문서와 실제로 검색되는 문서가 다르면 사용자는 버그로 느낀다.
+     *
+     * @param sessionId 익명 세션 id. 없으면 null
+     * @return 내 문서가 있으면 세션 id, 없으면 null (= 예시 문서를 검색한다는 뜻)
+     */
+    public String resolveSearchOwner(String sessionId) {
+        if (sessionId == null || !documentRepository.existsByOwner(sessionId)) {
+            return null;
+        }
+        return sessionId;
+    }
+
+    /**
      * 기록 -> 벡터 순서로 지운다 (업로드의 역순).
      * 중간에 실패하면 "기록 없는 벡터" (잔여 벡터)가 남는데, 이건 기동 시 점검과 /cleanup 으로 잡힌다.
      * 반대 순서면 "벡터 없는 기록"이 남아 감지할 방법이 없다.
