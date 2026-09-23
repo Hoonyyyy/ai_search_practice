@@ -25,13 +25,19 @@ const MetricsDashboard: React.FC<Props> = ({ serverReady }) => {
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
   const [logs, setLogs] = useState<QueryLog[]>([]);
   const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
 
   const load = async () => {
-    const [s, t, l] = await Promise.all([getMetricsSummary(), getTimeline(), getRecentLogs(100)]);
-    setSummary(s);
-    setTimeline(t);
-    setLogs(l);
-    setPage(1);
+    setLoading(true);
+    try {
+      const [s, t, l] = await Promise.all([getMetricsSummary(), getTimeline(), getRecentLogs(100)]);
+      setSummary(s);
+      setTimeline(t);
+      setLogs(l);
+      setPage(1);
+    } finally {
+      setLoading(false);   // 실패해도 버튼이 영원히 잠기면 안 된다
+    }
   };
 
   useEffect(() => { if (serverReady) load(); }, [serverReady]);
@@ -43,7 +49,9 @@ const MetricsDashboard: React.FC<Props> = ({ serverReady }) => {
     <div className={styles.container}>
       <div className={styles.topRow}>
         <h2 className={styles.title}>성능 대시보드</h2>
-        <button className={styles.refreshBtn} onClick={load}>새로고침</button>
+        <button className={styles.refreshBtn} onClick={load} disabled={loading}>
+          {loading ? '불러오는 중...' : '새로고침'}
+        </button>
       </div>
 
       {summary && (

@@ -28,7 +28,12 @@
   transition: border-color 0.15s;
 }
 
-.refreshBtn:hover {
+.refreshBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refreshBtn:hover:not(:disabled) {
   border-color: #666;
 }
 
