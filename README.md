@@ -4,9 +4,25 @@ PDF·TXT·MD 문서를 올리면 임베딩해 벡터 DB에 저장하고, 질문�
 
 ### 🔗 [배포된 서비스 바로가기](https://ai-search-practice-bk4z.vercel.app)
 
-> 무료 호스팅이라 **첫 접속 시 서버를 깨우는 데 최대 2분** 걸릴 수 있습니다. 두 번째부터는 2초 내외입니다.
+> 무료 호스팅이라 **첫 접속 시 서버를 깨우는 데 1~2분** 걸릴 수 있습니다. 화면에 경과 시간이 표시되고,
+> 깨어나면 목록과 대시보드가 자동으로 채워집니다. 그 뒤 검색은 2~4초입니다. (→ [스토리 7](#7-배포-후에야-드러난-것--안에서-부른-요청은-잠든-서버를-깨우지-못한다))
 
 React → Spring Boot → Python FastAPI → OpenAI / Groq / Qdrant Cloud / Supabase 로 이어지는 마이크로서비스 구조입니다. 로컬에서는 `.env` 설정만으로 Ollama + 임베디드 Qdrant + H2 의 완전 로컬 스택으로도 동작합니다.
+
+---
+
+## 한눈에 보기 — 측정으로 바꾼 것들
+
+느낌이 아니라 숫자로 판단하려 했습니다. 각 항목의 과정은 아래 [상세](#이-프로젝트에서-봐주셨으면-하는-것)에 있습니다.
+
+| 무엇 | Before | After | 어떻게 찾았나 |
+|---|---|---|---|
+| 검색 응답 (로컬 측정) | **4,485ms** | **53ms** | 내부 합계와 바깥 측정의 2초 차이를 추적 → IPv6 폴백 대기 |
+| 임베딩 모델 선택 | 감으로 고름 | Recall@4 **83.3%** 모델 채택 | 3종을 같은 코퍼스·평가셋으로 끝까지 비교 |
+| 검색 범위(top_k) | 넓을수록 좋다고 가정 | **4 유지** | 10으로 늘리면 검색 지표는 최고, **환각 25% → 100%** |
+| 첫 접속 (잠든 서버) | **153.7초** 무반응 | 안내 배너 + 병렬 깨우기, 이후 검색 **약 5초** | 로그 시각 대조로 "안에서는 못 깨운다"를 확인 |
+| 업로드 한도 | **200MB** (근거 없음) | **10MB × 동시 3개** | 운영과 같은 힙(358MB)에서 6단계 측정 |
+| 크기 초과 시 | 화면이 무한 로딩 | 즉시 사유 안내 | 413 응답에 본문·CORS 헤더가 없던 것을 브라우저로 확인 |
 
 ---
 
@@ -217,6 +233,28 @@ PDF 텍스트 추출은 **파일 크기의 약 5~6배** 힙을 씁니다. 한도
 
 ## 구조
 
+### 배포 구조 (현재 운영 중)
+
+```
+브라우저
+   │  REST + SSE
+   ▼
+React  ─ Vercel 정적 호스팅
+   │  REST + SSE
+   ▼
+Spring Boot  ─ Render (512MB)  ──→  Supabase Postgres (서울)   문서 메타 · 쿼리 로그
+   │  내부 HTTP
+   ▼
+FastAPI      ─ Render (512MB)  ──┬→ Qdrant Cloud (US East)     벡터 저장 · 검색
+                                 ├→ OpenAI  text-embedding-3-large (3072차원)
+                                 └→ Groq    openai/gpt-oss-120b   답변 생성
+```
+
+무료 티어라 **512MB 제한과 15분 후 잠드는 특성**이 설계에 그대로 영향을 줬습니다.
+업로드 한도(10MB × 동시 3개), 깨우는 순서, 임베딩 모델 선택이 모두 이 제약에서 나온 결정입니다.
+
+### 로컬 스택 (완전 로컬, 외부 API 없이)
+
 ```
 사용자 브라우저
     │  HTTP (REST + SSE)
@@ -245,12 +283,13 @@ Python AI 백엔드 (:8001)       H2 파일 DB
 | 영역 | 기술 |
 |---|---|
 | Frontend | React, TypeScript, CSS Modules, Custom Hooks |
-| Backend | Spring Boot 3.2, Java 17, JPA/H2, JUnit 5 + AssertJ |
+| Backend | Spring Boot 3.2, Java 17, JPA (배포: Supabase Postgres / 로컬: H2), JUnit 5 + AssertJ |
 | AI Backend | Python, FastAPI, pytest |
 | 임베딩 | OpenAI `text-embedding-3-large` (3072차원) 또는 Ollama `bge-m3` (`EMBED_PROVIDER`) |
 | LLM | Ollama `qwen2.5:3b` (로컬) 또는 Groq (`LLM_PROVIDER=groq`) |
 | 벡터 DB | Qdrant 임베디드 (로컬 파일) 또는 원격 (`QDRANT_URL`) |
 | 실행 | Docker Compose, PowerShell / Bash 스크립트 |
+| 배포 | Vercel (프론트) · Render (Spring / FastAPI, 무료 512MB) · Supabase Postgres · Qdrant Cloud |
 
 ---
 
