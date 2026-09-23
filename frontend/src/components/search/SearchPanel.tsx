@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
 import FileUpload from './FileUpload';
 import { useUpload } from '../../hooks/useUpload';
+import QuestionChips from './QuestionChips';
 import styles from './SearchPanel.module.css';
 
 interface Props {
   serverReady: boolean;
-  onSearch: () => void;
+  onSearch: (q?: string) => void;
   question: string;
   onQuestionChange: (q: string) => void;
   searching: boolean;
@@ -83,13 +84,17 @@ const SearchPanel: React.FC<Props> = ({ serverReady, onSearch, question, onQuest
           />
           <button
             className={styles.searchBtn}
-            onClick={onSearch}
+            onClick={() => onSearch()}
             disabled={searching || !question.trim()}
           >
             {searching ? '생성 중...' : '검색'}
           </button>
         </div>
         {searchError && <p className={styles.error}>{searchError}</p>}
+
+        {myDocs.length === 0 && sampleDocs.length > 0 && (
+          <QuestionChips onPick={onSearch} disabled={searching || !serverReady} />
+        )}
       </div>
     </div>
   );
