@@ -2,6 +2,78 @@
 
 ---
 
+## v4.30 — 회귀 테스트: 짜고 나서 일부러 깨뜨려 봤다
+
+### 왜 지금
+익명 세션으로 만든 규칙들은 **사람이 매번 확인할 수 없는 종류**다.
+만료를 손으로 보려면 1시간을 기다려야 하고(실제로 `ttl-minutes` 를 1분으로 바꿔서 겨우 봤다),
+세션 분리를 보려면 매번 시크릿 창을 열어야 하며, 403/404 는 화면에 보이지도 않는다.
+
+그리고 **v4.28 에서 실제로 깨졌다** — 목록만 만료를 반영하지 않아
+"목록에는 있는데 검색은 안 되는" 상태가 됐다.
+
+### 테스트 9개 추가 (자바 2 → 11)
+
+**`DocumentExpiryTest`** — 목록과 검색이 같은 만료 규칙을 쓰는지
+
+| 테스트 | 고정하는 규칙 |
+|---|---|
+| `expiredDocumentDisappearsAndSampleTakesOver` | 만료되면 목록에서 사라지고 예시 문서가 대신 나온다 |
+| `expiredDocumentIsAlsoOutOfSearchScope` | 만료되면 검색 범위에서도 빠진다 |
+| `livingDocumentAppearsInBothListAndSearch` | 살아 있으면 둘 다에 잡힌다 |
+| `sampleIsNeverExpired` | 예시 문서(owner = null)는 3일이 지나도 안 사라진다 |
+
+**`DocumentDeletePermissionTest`** — `DeleteResult` 3분기 전부
+
+| 테스트 | 고정하는 규칙 |
+|---|---|
+| `otherSessionSeesSampleNotMyDocument` | 남의 문서는 목록에 안 보인다 |
+| `ownerCanDeleteOwnDocument` | 주인은 지울 수 있고, **벡터 삭제도 요청된다**(`verify`) |
+| `deletingSomeoneElsesDocumentReturnsNotFound` | 남의 문서는 404, **실제로 안 지워진다** |
+| `sampleDocumentCannotBeDeletedByAnyone` | 예시 문서는 403, **실제로 안 지워진다** |
+| `deletingUnknownDocumentReturnsNotFound` | 없는 id 는 404 |
+
+**반환값만 보면 부족하다.** `NOT_FOUND` 를 돌려주면서 실제로는 지워버리는 코드도 통과한다.
+그래서 `existsById` 로 **"안 지워졌다"를 따로 확인**한다.
+`verify(aiServiceClient).deleteVectors(...)` 는 반환값으로 볼 수 없는 것을 본다 —
+DB 만 지우고 벡터를 빠뜨리면 잔여 벡터가 쌓인다(v4.26 에서 실제로 겪었다).
+
+### 시간을 기다리지 않는다
+`LocalDateTime.now().minusMinutes(61)` 로 **61분 전에 올린 문서를 지어낸다.**
+운영 코드를 건드리지 않고 만료 상태를 만드는 방법이고, 이것이 이 테스트의 존재 이유다.
+
+### 테스트가 테스트임을 증명했다 (수동 뮤테이션 테스팅)
+통과하는 테스트는 쉽다. 중요한 건 **실패해야 할 때 실패하는가**다.
+v4.28 의 버그를 운영 코드에 일부러 되돌리고 돌려봤다.
+
+```
+X  expiredDocumentDisappearsAndSampleTakesOver   <- 정확히 이것만 실패
+O  나머지 10개 통과                                <- 엉뚱한 곳이 안 터진다
+```
+
+하나만 터지는 것도 중요하다. 버그 하나에 테스트 다섯이 빨개지면 원인을 못 찾는다.
+확인 후 즉시 원복했다.
+
+### 앱은 한 번만 띄운다
+`@SpringBootTest(properties = ...)` 의 값이 **글자 하나라도 다르면 Spring 이 앱을 새로 띄운다.**
+두 클래스의 설정을 같은 문자열로 맞추자 두 번째부터 컨텍스트를 재사용했다.
+
+| | 첫 실행 | 설정을 맞춘 뒤 |
+|---|---|---|
+| `DocumentExpiryTest` | 9.5초 | **0.076초** |
+
+메모리 DB(`jdbc:h2:mem:ragsearchtest`)를 쓰는 것도 중요하다 —
+기본 설정대로면 `@BeforeEach` 의 `deleteAll()` 이 **개발용 로컬 H2 파일을 지운다.**
+개발 데이터를 날리는 테스트는 아무도 돌리지 않게 된다.
+
+`@MockBean AiServiceClient` 로 FastAPI·OpenAI 없이 돈다.
+
+### 남은 것
+- 세션 없는 업로드 거절, 문서 1개 제한(교체) — 업로드 경로라 가짜 `MultipartFile` 이 필요하다
+- 프론트엔드 테스트 0개
+
+---
+
 ## v4.29 — 예시 질문 칩: 평가셋에 있다고 답이 나오는 게 아니었다
 
 ### 왜
