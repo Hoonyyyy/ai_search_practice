@@ -27,6 +27,15 @@ export function useUpload() {
       setError(`${MAX_UPLOAD_MB}MB 이하 파일만 올릴 수 있어요. (선택한 파일: ${file.name}, ${sizeMb.toFixed(1)}MB)`);
       return;
     }
+
+    const existing = docs.find((d) => !d.sample);
+    if (existing && !window.confirm(
+      `이미 "${existing.filename}" 을 올려두셨어요.\n` +
+      `"${file.name}" 으로 바꿀까요?\n\n기존 문서는 삭제됩니다.`
+    )) {
+      return;
+    }
+
     wakeAiService();
     setUploading(true);
     setUploadStatus('');

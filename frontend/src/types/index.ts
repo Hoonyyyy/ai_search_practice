@@ -3,6 +3,7 @@ export interface DocumentInfo {
   filename: string;
   chunk_count: number;
   uploaded_at: string;
+  sample: boolean;    // 예시 문서 (서버에서 판단함)
 }
 
 export interface SourceChunk {

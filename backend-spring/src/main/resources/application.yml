@@ -36,6 +36,8 @@ document:
   chunk-size: 500
   chunk-overlap: 100
   allowed-extensions: .pdf,.txt,.md
+  ttl-minutes: 60           # 익명 세션 문서 수명
+  sweep-interval-ms: 600000 # 10분마다 클리어
 
 logging:
   file:

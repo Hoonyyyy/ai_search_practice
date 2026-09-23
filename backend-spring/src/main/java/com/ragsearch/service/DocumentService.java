@@ -13,6 +13,7 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -45,6 +46,9 @@ public class DocumentService {
 
     @Value("${document.allowed-extensions:.pdf,.txt,.md}")
     private String allowedExtensions;
+
+    @Value("${document.ttl-minutes:60}")
+    private int ttlMinutes;
 
     /** 삭제 요청의 결과. 컨트롤러가 상태 코드를 고르는 근거가 된다. */
     public enum DeleteResult { DELETED, NOT_FOUND, SAMPLE_PROTECTED }
@@ -145,6 +149,9 @@ public class DocumentService {
                     .build();
             documentRepository.save(document);
 
+            // 세션당 문서 1개 - 새 문서가 확실히 저장된 뒤에 옛 문서를 지운다.
+            replaceOlderDocuments(sessionId, docId);
+
             log.info("upload timing -> extract {}ms,  split {}ms, embed {}ms, total {}ms ({} chunks, textLen {}, longest {})",
                     tExtract - t0,
                     tSplit - tExtract,
@@ -192,7 +199,7 @@ public class DocumentService {
     public List<DocumentDto> listDocuments(String sessionId) {
         List<Document> mine = sessionId == null
                 ? List.of()
-                : documentRepository.findAllByOwnerOrderByUploadedAtDesc(sessionId);
+                : documentRepository.findAllByOwnerAndUploadedAtAfterOrderByUploadedAtDesc(sessionId, aliveSince());
 
         List<Document> visible = mine.isEmpty()
                 ? documentRepository.findAllByOwnerIsNullOrderByUploadedAtDesc()
@@ -200,6 +207,59 @@ public class DocumentService {
 
         return visible.stream().map(DocumentDto::from).toList();
     }
+
+    /** 이 시각보다 나중에 올라온 문서만 살아 있다. 화면·검색·청소가 같은 기준을 쓴다. */
+    private LocalDateTime aliveSince() {
+        return LocalDateTime.now().minusMinutes(ttlMinutes);
+    }
+
+    /**
+     * 검색 범위로 쓸 소유자를 정한다. 목록(listDocuments)과 같은 규칙이어야 한다 —
+     * 화면에 보이는 문서와 실제로 검색되는 문서가 다르면 사용자는 버그로 느낀다.
+     *
+     * @param sessionId 익명 세션 id. 없으면 null
+     * @return 내 문서가 있으면 세션 id, 없으면 null (= 예시 문서를 검색한다는 뜻)
+     */
+    public String resolveSearchOwner(String sessionId) {
+        if (sessionId == null || !documentRepository.existsByOwnerAndUploadedAtAfter(sessionId, aliveSince())) {
+            return null;
+        }
+        return sessionId;
+    }
+
+    /**
+     * 이 세션의 다른 문서를 모두 지운다 (세션당 1개 규칙).
+     *
+     * 지우는 시점이 중요하다. 새 문서를 저장하기 전에 지우면,
+     * 업로드가 중간에 실패했을 때 사용자는 있던 문서마저 잃는다.
+     * 그래서 새 문서가 확실히 저장된 뒤에 지운다 - 잠깐 2개가 공존하는 편이 낫다.
+     *
+     * @param sessionId 익명 세션 id
+     * @param keepDocId 방금 올린 문서 (이건 남긴다)
+     */
+    private void replaceOlderDocuments(String sessionId, String keepDocId) {
+        documentRepository.findAllByOwnerOrderByUploadedAtDesc(sessionId).stream()
+                .filter(doc -> !doc.getDocId().equals(keepDocId))
+                .forEach(doc -> deleteDocument(doc.getDocId(), sessionId));
+    }
+
+    /**
+     * 수명이 지난 익명 문서를 치운다.
+     *
+     * 화면과 검색은 이미 aliveSince() 로 만료 시점에 끊기므로, 이 청소가 최대 10분 늦어도
+     * 사용자에게는 보이지 않는다. 여기서 하는 일은 저장 공간 회수다.
+     * 예시 문서(owner = null)는 쿼리에서 제외되므로 절대 지워지지 않는다.
+     */
+    @Scheduled(fixedDelayString = "${document.sweep-interval-ms:600000}", initialDelayString = "60000")
+    public void sweepExpiredDocuments() {
+        List<Document> expired = documentRepository.findAllByOwnerIsNotNullAndUploadedAtBefore(aliveSince());
+        if (expired.isEmpty()) {
+            return;
+        }
+        expired.forEach(doc -> deleteDocument(doc.getDocId(), doc.getOwner()));
+        log.info("만료 문서 {}건 정리 (수명 {}분)", expired.size(), ttlMinutes);
+    }
+    /**
 
     /**
      * 기록 -> 벡터 순서로 지운다 (업로드의 역순).

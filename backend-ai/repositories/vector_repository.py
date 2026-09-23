@@ -13,6 +13,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, VectorParams, PointStruct,
     Filter, FieldCondition, MatchValue,
+    IsEmptyCondition, PayloadField,
 )
 from qdrant_client.http.exceptions import UnexpectedResponse
 
@@ -172,7 +173,19 @@ def _to_dict(payload: Dict[str, Any], score: float) -> Dict[str, Any]:
     }
 
 
-def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
+def _owner_filter(owner: Optional[str]) -> Filter:
+    """검색 범위를 한 세션으로 좁히는 조건.
+
+    owner가 있으면 그 세션의 청크만, 없으면 owner가 비어 있는 청크(= 예시 문서)만 본다.
+    후보를 top_k로 뽑은 뒤에 걸러내면 안된다 - 남의 청크가 상위를 차지하면
+    내 청크는 아예 후보에 들지 못한다. 그래서 조건을 Qdrant 에게 넘긴다
+    """
+    if owner:
+        return Filter(must=[FieldCondition(key="owner", match=MatchValue(value=owner))])
+    return Filter(must=[IsEmptyCondition(is_empty=PayloadField(key="owner"))])
+
+
+def similarity_search(query: str, top_k: int = 4, owner: Optional[str] = None) -> List[Dict[str, Any]]:
 
     t_start = time.time()
 
@@ -184,13 +197,14 @@ def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
 
     t0 = time.time()
 
-    total = client.count(collection_name=COLLECTION).count
+    flt = _owner_filter(owner)
+    total = client.count(collection_name=COLLECTION, count_filter=flt).count
 
     t_count = time.time() - t0
 
     # 청크가 얼마 없으면 검색 자체가 손해 — 전부 넣고 순서만 정렬한다.
     if 0 < total <= settings.full_context_threshold:
-        pts, _ = client.scroll(collection_name=COLLECTION, limit=total, with_payload=True)
+        pts, _ = client.scroll(collection_name=COLLECTION, scroll_filter=flt, limit=total, with_payload=True)
         pts.sort(key=lambda p: (p.payload["doc_id"], p.payload["chunk_index"]))
         return [_to_dict(p.payload, 1.0) for p in pts]
 
@@ -205,6 +219,7 @@ def similarity_search(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
     result = client.query_points(
         collection_name=COLLECTION,
         query=query_vec,
+        query_filter=flt,
         limit=top_k,
         with_payload=True,
     )

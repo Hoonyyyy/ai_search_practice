@@ -26,6 +26,8 @@ from pathlib import Path
 
 import requests
 
+from eval_session import EVAL_OWNER
+
 BASE = Path(__file__).parent
 AI_URL = "http://127.0.0.1:8001"
 REFUSAL = "찾을 수 없습니다"
@@ -47,7 +49,7 @@ def answer(question: str, top_k: int):
     """검색 -> LLM 스트리밍. 실제 서비스와 같은 경로를 탄다."""
     chunks = requests.post(
         f"{AI_URL}/ai/search",
-        json={"query": question, "top_k": top_k},
+        json={"query": question, "top_k": top_k, "owner": EVAL_OWNER},
         timeout=180,
     ).json()["chunks"]
 
