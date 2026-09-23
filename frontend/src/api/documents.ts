@@ -46,6 +46,7 @@ export const uploadDocument = async (file: File, callbacks: UploadCallbacks): Pr
           filename: json.filename,
           chunk_count: json.chunk_count,
           uploaded_at: json.uploaded_at ?? '',
+          sample: false,    // 방금 내가 올린 문서 - 예시일 수 없다
         });
       } else if (json.stage === 'error') {
         callbacks.onError(json.message);

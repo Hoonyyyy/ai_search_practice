@@ -39,6 +39,12 @@
   font-weight: 700;
 }
 
+.rule {
+  margin-top: 8px;
+  color: #888;
+  font-size: 12px;
+}
+
 .statusText {
   color: #6366f1;
   font-size: 14px;

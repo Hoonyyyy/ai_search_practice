@@ -68,6 +68,7 @@ const FileUpload: React.FC<Props> = ({ onUpload, uploading, uploadStatus, upload
           <div className={styles.icon}>📄</div>
           <div className={styles.hint}>PDF, TXT, MD 파일을 드래그하거나 클릭하여 업로드</div>
           <div className={styles.limit}>파일당 최대 {MAX_UPLOAD_MB}MB</div>
+          <div className={styles.rule}>문서는 1개만 사용해요 · 새로 올리면 교체됩니다</div>
         </>
       )}
     </div>

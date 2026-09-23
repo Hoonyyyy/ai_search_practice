@@ -17,6 +17,9 @@ const SearchPanel: React.FC<Props> = ({ serverReady, onSearch, question, onQuest
 
   useEffect(() => { if (serverReady) loadDocs(); }, [serverReady]);
 
+  const myDocs = docs.filter((d) => !d.sample);
+  const sampleDocs = docs.filter((d) => d.sample);
+
   return (
     <div className={styles.container}>
       <div>
@@ -30,11 +33,11 @@ const SearchPanel: React.FC<Props> = ({ serverReady, onSearch, question, onQuest
         {uploadError && <p className={styles.error} role="alert">⚠ {uploadError}</p>}
       </div>
 
-      {docs.length > 0 && (
+      {myDocs.length > 0 && (
         <div>
-          <h3 className={styles.sectionTitle}>업로드된 문서 ({docs.length})</h3>
+          <h3 className={styles.sectionTitle}>내 문서</h3>
           <div className={styles.docList}>
-            {docs.map((doc) => (
+            {myDocs.map((doc) => (
               <div key={doc.doc_id} className={styles.docItem}>
                 <div>
                   <span className={styles.docName}>{doc.filename}</span>
@@ -45,7 +48,26 @@ const SearchPanel: React.FC<Props> = ({ serverReady, onSearch, question, onQuest
                 </button>
               </div>
             ))}
+          <p className={styles.hint}>올린 문서는 1시간 뒤 자동으로 삭제돼요.</p>
           </div>
+        </div>
+      )}
+
+      {sampleDocs.length > 0 && (
+        <div>
+          <h3 className={styles.sectionTitle}>예시 문서</h3>
+          <div className={styles.docList}>
+            {sampleDocs.map((doc) => (
+              <div key={doc.doc_id} className={styles.docItem}>
+                <div>
+                  <span className={styles.badge}>예시</span>
+                  <span className={styles.docName}>{doc.filename}</span>
+                  <span className={styles.docMeta}>{doc.chunk_count} 청크</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className={styles.hint}>먼저 둘러보시라고 올려둔 문서예요. 내 문서를 올리면 숨겨집니다.</p>
         </div>
       )}
 

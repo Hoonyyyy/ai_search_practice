@@ -107,3 +107,22 @@
   padding: 10px 12px;
   margin: 8px 0 0;
 }
+
+/* 예시 문서 표시 */
+.badge {
+  display: inline-block;
+  background: #8b5cf61a;
+  border: 1px solid #8b5cf680;
+  color: #a78bfa;
+  border-radius: 5px;
+  padding: 2px 7px;
+  margin-right: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hint {
+  color: #777;
+  font-size: 12px;
+  margin: 8px 0 0;
+}
