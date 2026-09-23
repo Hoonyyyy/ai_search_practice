@@ -17,6 +17,7 @@ class EmbedAndStoreRequest(BaseModel):
     doc_id: str
     filename: str
     chunks: List[str]
+    owner: str
 
 
 @router.post("/embed-and-store")
@@ -32,7 +33,7 @@ async def embed_and_store(req: EmbedAndStoreRequest, request: Request):
     async def generate():
         completed = False
         try:
-            batches = vector_repository.add_chunks_stream(req.doc_id, req.filename, req.chunks)
+            batches = vector_repository.add_chunks_stream(req.doc_id, req.filename, req.chunks, req.owner)
             async for done, total in iterate_in_threadpool(batches):
                 if await request.is_disconnected():
                     return                      # 호출한 쪽이 떠났다 — 더 쓰지 않는다

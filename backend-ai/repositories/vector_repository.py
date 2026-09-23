@@ -54,6 +54,15 @@ def _get_client() -> QdrantClient:
         except (UnexpectedResponse, ValueError):
             pass
 
+        # owner 필터 검색용. 인덱스가 없으면 Qdrant 가 필터를 무시하거나 전수 검사를 한다.
+        try:
+            _client.create_payload_index(
+                collection_name=COLLECTION,
+                field_name="owner",
+                field_schema="keyword",
+            )
+        except (UnexpectedResponse, ValueError):
+            pass
     return _client
 
 
@@ -91,12 +100,12 @@ def _embed_cloud(texts: List[str]) -> List[List[float]]:
     """
     if not settings.embed_api_key:
         raise RuntimeError("EMBED_API_KEY 가 없습니다. .env 를 확인하세요.")
-    
+
     resp = requests.post(
         f"{settings.embed_api_url}/embeddings",
         headers={"Authorization": f"Bearer {settings.embed_api_key}"},
         json={
-            "model": settings.embed_cloud_model, 
+            "model": settings.embed_cloud_model,
             "input": texts,
         },
         timeout=120,
@@ -107,7 +116,7 @@ def _embed_cloud(texts: List[str]) -> List[List[float]]:
 
 
 
-def add_chunks_stream(doc_id: str, filename: str, chunks: List[str]) -> Generator:
+def add_chunks_stream(doc_id: str, filename: str, chunks: List[str], owner: str) -> Generator:
     """배치 단위로 Qdrant에 저장하며 진행률을 (done, total)로 yield."""
     client = _get_client()
     total = len(chunks)
@@ -134,6 +143,7 @@ def add_chunks_stream(doc_id: str, filename: str, chunks: List[str]) -> Generato
                     "filename": filename,
                     "chunk_index": i + j,
                     "content": batch[j],
+                    "owner":owner,
                 },
             )
             for j in range(len(batch))

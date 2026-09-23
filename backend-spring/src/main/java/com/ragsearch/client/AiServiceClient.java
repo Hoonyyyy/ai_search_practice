@@ -44,12 +44,13 @@ public class AiServiceClient {
      * 청크 목록을 Python AI 서비스로 보내 임베딩 후 Qdrant에 저장.
      * Python이 SSE로 진행률을 보내면 SseEmitter로 React에 프록시한다.
      */
-    public void embedAndStore(String docId, String filename, List<String> chunks, SseEmitter emitter) {
+    public void embedAndStore(String docId, String filename, List<String> chunks, String owner, SseEmitter emitter) {
         String url = aiServiceUrl + "/ai/documents/embed-and-store";
         Map<String, Object> body = Map.of(
                 "doc_id", docId,
                 "filename", filename,
-                "chunks", chunks
+                "chunks", chunks,
+                "owner", owner
         );
 
         for (int attempt = 0; attempt < MAX_RETRY; attempt++) {

@@ -8,5 +8,8 @@ import java.util.List;
 
 @Repository
 public interface DocumentRepository extends JpaRepository<Document, String> {
-    List<Document> findAllByOrderByUploadedAtDesc();
+    /** 특정 세션이 올린 문서 (내 문서) */
+    List<Document> findAllByOwnerOrderByUploadedAtDesc(String owner);
+    /** owner 가 없는 문서 = 예시 문서 */
+    List<Document> findAllByOwnerIsNullOrderByUploadedAtDesc();
 }
