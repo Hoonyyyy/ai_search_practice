@@ -25,6 +25,7 @@ public class SearchService {
     private final AiServiceClient aiServiceClient;
     private final ExecutorService sseExecutor;
     private final ObjectMapper objectMapper;
+    private final DocumentService documentService;
 
     /**
      * 질문에 대한 RAG 검색 및 LLM 응답을 SSE 스트리밍.
@@ -36,8 +37,12 @@ public class SearchService {
      * 4. 쿼리 로그 JPA 저장
      * 5. 완료 이벤트 전송
      */
-    public SseEmitter query(String question, int topK) {
+    public SseEmitter query(String question, int topK, String sessionId) {
         SseEmitter emitter = new SseEmitter(300_000L);
+
+        // 람다 밖에서 정한다 - 람다가 쓰는 값은 더 이상 안 바뀌어야 하고(effectively final),
+        // DB 조회는 요청 스레드에서 끝내는 편이 추적하기 쉬움
+        String owner = documentService.resolveSearchOwner(sessionId);
 
         sseExecutor.execute(() -> {
             String queryId = UUID.randomUUID().toString();
@@ -55,7 +60,7 @@ public class SearchService {
                 // 1. 벡터 유사도 검색
                 List<Map<String, Object>> chunks;
                 try {
-                    chunks = aiServiceClient.searchVectors(question, topK);
+                    chunks = aiServiceClient.searchVectors(question, topK, owner);
                 } finally {
                     heartbeat.shutdownNow();
                 }

@@ -2,6 +2,71 @@
 
 ---
 
+## v4.27 — 익명 세션 (2/3): 새는 걸 먼저 찍고, 막고, 다시 찍었다
+
+### 증거부터 남겼다
+v4.26 으로 **목록은 나뉘었지만 검색은 그대로**였다. 고치기 전에 새 세션으로 화면을 찍었다.
+
+| | 화면의 문서 목록 | 질문 "입사 1년 이상이면 연차가 며칠?" 의 답변 | 참고 문서 |
+|---|---|---|---|
+| **before** | 갤럭시북 1건 | "매년 **15일**의 연차가 부여됩니다. 반차는 09~13시, 14~18시" | **세션테스트.txt** + 갤럭시북 3건 |
+| **after** | 갤럭시북 1건 | "제공된 문서에서 해당 정보를 찾을 수 없습니다." | 갤럭시북 **4건** |
+
+`docs/images/session-leak-before.png`, `session-leak-after.png`.
+**화면엔 없는 문서의 내용을 답변이 말하고 있었다** — 목록만 나누면 생기는 정확한 증상이다.
+고친 뒤에는 고치기 전 상태가 이미 없으므로, **순서를 지켜야만 남는 기록**이다.
+
+### 필터는 Qdrant 에게 넘겼다 (뽑고 거르지 않았다)
+`top_k` 로 후보를 뽑은 뒤 파이썬에서 남의 청크를 걸러내는 방법은 틀렸다.
+남의 청크가 상위 4개를 차지하면 **내 청크는 애초에 후보에 들지 못하고**, 걸러낸 뒤엔 0건이 된다.
+그래서 `owner` 조건을 `query_points(query_filter=...)` 로 넘긴다. 원격 Qdrant 엔 `owner` keyword 인덱스도 만든다.
+
+owner 가 없으면(= 아무 문서도 안 올린 방문자) `IsEmptyCondition` 으로 **payload 에 owner 가 비어 있는 청크**,
+즉 예시 문서만 본다. 배포된 갤럭시북은 익명 세션 이전에 올라가 owner 키 자체가 없으므로 **여기에 그냥 들어맞는다.**
+
+### `count` 가 `query` 보다 크게 새는 구멍이었다
+`full_context_threshold` — 전체 청크가 12개 이하면 검색을 건너뛰고 **전부 답변 근거로** 넣는 지름길이 있다.
+이 "전체"가 모든 사람의 청크를 세고 있었다. 방문자가 3청크짜리 문서 하나만 올린 상황에서
+이 지름길이 타지면 **남의 문서가 통째로** 프롬프트에 들어간다.
+`count(count_filter=...)`, `scroll(scroll_filter=...)` 까지 같은 조건을 넣어야 끝난다.
+
+검증에서 이게 드러났다: 주인 세션으로 검색하니 **1건만** 왔다 — 그 세션의 문서는 청크가 1개뿐이라
+`1 ≤ 12` 로 지름길을 탄 것. 필터 전이었다면 123개로 세어져 유사도 검색을 했을 것이다.
+
+### 보이는 것과 검색되는 것을 한 규칙으로
+검색 범위는 Spring 이 정한다(`DocumentService.resolveSearchOwner`) — **`listDocuments` 와 같은 규칙**이다.
+내 문서가 있으면 내 것만, 없으면 예시 문서. 화면에 보이는 문서와 검색되는 문서가 다르면 사용자는 버그로 느낀다.
+`owner` 는 null 일 수 있어 `Map.of` 대신 `HashMap` 을 쓴다(`Map.of` 는 null 값에 NPE).
+FastAPI 쪽은 `owner: Optional[str]` 을 **기본값 없이** 둬서, 필드를 빠뜨리면 422 로 즉시 드러나게 했다.
+
+### 평가 하네스가 조용히 깨져 있었다
+익명 세션이 생기면서 `reload_corpus.py` 의 업로드는 세션 헤더가 없어 거절당하고,
+`run_eval.py` / `run_answer_eval.py` 의 검색은 `owner` 가 없어 422 가 된다.
+**포트폴리오의 핵심 도구가 조용히 죽어 있었다** — 평가를 안 돌리는 동안엔 아무도 모른다.
+
+`evals/eval_session.py` 에 `EVAL_OWNER = "eval-harness"` 하나만 두고 세 스크립트가 가져다 쓴다.
+세 곳에 각각 적으면 한 곳만 틀려도 **에러 없이 Recall 0%** 가 나오고, 그 숫자를 보고 임베딩 모델을 의심하게 된다.
+
+### 변경
+| 파일 | 변경 |
+|---|---|
+| `SearchController` | `X-Session-Id` 헤더 수신 |
+| `SearchService` | 람다 밖에서 `resolveSearchOwner`, 검색 호출에 owner 전달 |
+| `DocumentService` | `resolveSearchOwner` 추가 (목록과 같은 규칙) |
+| `DocumentRepository` | `existsByOwner` |
+| `AiServiceClient` | `searchVectors(query, topK, owner)` — `HashMap`(null 허용) |
+| `routers/search.py` | `owner: Optional[str]` (기본값 없음) |
+| `repositories/vector_repository.py` | `_owner_filter()`, `count`/`scroll`/`query_points` 세 곳에 적용 |
+| `evals/eval_session.py` (신규) | `EVAL_OWNER` 한 곳 정의 |
+| `evals/{reload_corpus,run_eval,run_answer_eval}.py` | 헤더·owner 전달 |
+
+### 아직 안 된 것
+- UI 가 오해를 부른다: 예시 문서에 삭제 버튼(누르면 403), "업로드된 문서 (1)" 이 **2개 이상도 되는 것처럼** 읽힌다
+- 문서 1개 제한(교체 확인), 1시간 만료 청소
+- 회귀 테스트 — 지금 만든 분리는 **사람이 매번 시크릿 창을 열어 확인할 수 없는** 종류다
+
+---
+
 ## v4.26 — 익명 세션 (1/3): 문서에 주인을 붙였다
 
 ### 문제 — 배포된 데모는 모두가 같은 서랍을 쓴다

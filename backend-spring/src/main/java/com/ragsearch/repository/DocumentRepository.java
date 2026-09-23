@@ -12,4 +12,7 @@ public interface DocumentRepository extends JpaRepository<Document, String> {
     List<Document> findAllByOwnerOrderByUploadedAtDesc(String owner);
     /** owner 가 없는 문서 = 예시 문서 */
     List<Document> findAllByOwnerIsNullOrderByUploadedAtDesc();
+
+    /** 이 세션이 올린 문서가 하나라도 있는지 (검색 범위 판단용) */
+    boolean existsByOwner(String owner);
 }

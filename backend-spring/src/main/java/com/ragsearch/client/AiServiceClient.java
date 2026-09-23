@@ -13,6 +13,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -89,9 +90,14 @@ public class AiServiceClient {
      * 동기 HTTP 호출 (블로킹). 502 시 최대 150초간 재시도.
      */
     @SuppressWarnings("unchecked")
-    public List<Map<String, Object>> searchVectors(String query, int topK) {
+    public List<Map<String, Object>> searchVectors(String query, int topK, String owner) {
         String url = aiServiceUrl + "/ai/search";
-        Map<String, Object> body = Map.of("query", query, "top_k", topK);
+
+        // owner 는 null 일 수 있다(= 예시 문서). Map.of 는 null 값에 NPE 를 던지므로 HashMap 을 쓴다.
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", query);
+        body.put("top_k", topK);
+        body.put("owner", owner);
 
         for (int attempt = 0; attempt < MAX_RETRY; attempt++) {
             try {
