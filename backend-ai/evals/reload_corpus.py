@@ -18,34 +18,48 @@ from pathlib import Path
 
 import requests
 
-from eval_session import EVAL_OWNER
+from eval_session import OWNERS, owner_for
 
 SPRING = "http://127.0.0.1:8080"
-HEADERS = {"X-Session-Id": EVAL_OWNER}  # 익명 세션 도입 후 업로드·목록·삭제가 이걸 요구한다
 CORPUS_DIR = Path(r"C:\Users\onsyg\Desktop\예시pdf")
-FILES = ["Galaxybook_guide.pdf", "사람인_이력서_강현수.pdf"]
+FILES = list(OWNERS)  # 평가셋이 쓰는 문서 = 세션 매핑에 등록된 문서
 
 
-def list_documents():
-    return requests.get(f"{SPRING}/api/documents", headers=HEADERS, timeout=30).json()
+def headers(doc: str):
+    """문서마다 세션이 다르다 - 운영이 세션당 문서 1개만 두기 때문이다.
+
+    업로드·목록·삭제가 모두 이 헤더를 요구한다.
+    """
+    return {"X-Session-Id": owner_for(doc)}
 
 
-def delete_all():
-    docs = list_documents()
-    for d in docs:
-        requests.delete(f"{SPRING}/api/documents/{d['doc_id']}", headers=HEADERS, timeout=60)
+def list_documents(doc: str):
+    """그 세션이 보는 목록. 예시 문서(owner NULL)도 같이 온다."""
+    return requests.get(f"{SPRING}/api/documents", headers=headers(doc), timeout=30).json()
+
+
+def delete_all(doc: str):
+    """그 세션이 가진 문서만 지운다.
+
+    예시 문서(sample=True, owner NULL)는 건너뛴다 - 서버가 403 으로 막고,
+    로컬 화면에서 쓰는 문서라 지워서도 안 된다.
+    """
+    mine = [d for d in list_documents(doc) if not d.get("sample")]
+    for d in mine:
+        requests.delete(f"{SPRING}/api/documents/{d['doc_id']}", headers=headers(doc), timeout=60)
         print(f"  삭제: {d['filename']} ({d['chunk_count']}청크)")
-    return len(docs)
+    return len(mine)
 
 
-def upload(path: Path):
+def upload(doc: str):
     """SSE 스트림을 끝까지 읽어 업로드 완료를 기다린다."""
+    path = CORPUS_DIR / doc
     started = time.time()
     with path.open("rb") as fh:
         resp = requests.post(
             f"{SPRING}/api/documents/upload",
             files={"file": (path.name, fh, "application/pdf")},
-            headers=HEADERS,
+            headers=headers(doc),
             stream=True,
             timeout=900,
         )
@@ -69,18 +83,25 @@ def main():
             sys.exit(f"원본 PDF 없음: {CORPUS_DIR / name}")
 
     print("기존 문서 삭제")
-    if delete_all() == 0:
+    removed = sum(delete_all(name) for name in FILES)
+    if removed == 0:
         print("  (없음)")
 
-    print("\n재업로드")
+    print("\n재업로드 (문서마다 세션을 따로 쓴다 - 운영과 같은 조건)")
     for name in FILES:
-        upload(CORPUS_DIR / name)
+        upload(name)
 
     print("\n결과")
     total = 0
-    for d in list_documents():
-        print(f"  {d['filename']}  {d['chunk_count']}청크")
-        total += d["chunk_count"]
+    for name in FILES:
+        mine = [d for d in list_documents(name) if not d.get("sample")]
+        # 세션당 1개가 운영 규칙이다. 2개 이상이면 규칙이나 이 스크립트가 어긋난 것이다.
+        flag = "" if len(mine) == 1 else f"   <-- 문서 {len(mine)}개! 세션당 1개여야 한다"
+        for d in mine:
+            print(f"  [{owner_for(name)}] {d['filename']}  {d['chunk_count']}청크{flag}")
+            total += d["chunk_count"]
+        if not mine:
+            print(f"  [{owner_for(name)}] 없음{flag}")
     print(f"  합계 {total}청크")
 
     leftovers = requests.get(f"{SPRING}/api/documents/leftovers", timeout=30).json()

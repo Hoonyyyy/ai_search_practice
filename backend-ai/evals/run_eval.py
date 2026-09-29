@@ -12,33 +12,35 @@ import argparse
 import io
 import json
 import re
+import sys
 import time
 import unicodedata
 from pathlib import Path
 
 import requests
 
-from eval_session import EVAL_OWNER
+from eval_session import owner_for
+from eval_text import normalize
+
+# 출력을 파일이나 파이프로 넘기면 파이썬은 콘솔 코드페이지(윈도우 = cp949)로 쓴다.
+# 그런데 LLM 답변에는 U+202F(NARROW NO-BREAK SPACE) 같은 문자가 섞여 있어
+# cp949 로 인코딩되지 않고, 채점이 아니라 "출력"에서 평가가 통째로 죽는다.
+# 비교는 normalize() 가 이미 처리하므로, 남은 문제는 표준출력뿐이다.
+if (sys.stdout.encoding or "").lower().replace("-", "") != "utf8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 BASE = Path(__file__).parent
 AI_URL = "http://127.0.0.1:8001"
 
 
-def normalize(text: str) -> str:
-    """비교용 정규화.
-
-    LLM 과 PDF 는 눈에 안 보이는 공백을 섞어 쓴다. 예를 들어 LLM 은
-    "50 cm" 의 공백으로 U+202F(NARROW NO-BREAK SPACE) 를 쓰는데, 화면에는
-    보통 공백과 똑같이 보이지만 문자열 비교는 실패한다.
-    NFKC 로 호환 문자를 펴고, 모든 공백류를 보통 공백 하나로 접는다.
-    """
-    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", text))
 
 
-def search(question: str, top_k: int):
+def search(question: str, top_k: int, owner: str):
+    """그 문서의 세션으로만 검색한다 - 운영에서 검색은 문서 하나만 본다."""
     resp = requests.post(
         f"{AI_URL}/ai/search",
-        json={"query": question, "top_k": top_k, "owner": EVAL_OWNER},
+        json={"query": question, "top_k": top_k, "owner": owner},
         timeout=180,
     )
     resp.raise_for_status()
@@ -69,13 +71,15 @@ def main():
 
     for item in dataset:
         started = time.time()
-        chunks = search(item["question"], args.top_k)
+        chunks = search(item["question"], args.top_k, owner_for(item["doc"]))
         took_ms = (time.time() - started) * 1000
         total_ms += took_ms
 
         rank = find_rank(chunks, item["expect"])
         got_docs = [c["metadata"]["filename"] for c in chunks]
-        doc_ok = item["doc"] in got_docs
+        # 문서가 하나뿐이므로 이건 품질 지표가 아니라 누출 감지기다.
+        # 100% 가 아니면 owner 필터가 새고 있다는 뜻이다.
+        doc_ok = got_docs != [] and all(d == item["doc"] for d in got_docs)
 
         hits += rank is not None
         doc_hits += doc_ok
@@ -100,12 +104,25 @@ def main():
 
     print("-" * 78)
     print(f"Recall@{k}     : {hits}/{n}  ({hits / n * 100:.1f}%)")
-    print(f"문서 적중@{k}  : {doc_hits}/{n}  ({doc_hits / n * 100:.1f}%)")
+    print(f"MRR@{k}        : {rr_sum / n:.3f}")
+    print(f"평균 검색 시간 : {total_ms / n:.0f}ms")
 
-    print(f"MRR@{k}   : {rr_sum / n:.3f}")
+    # 문서가 하나뿐인 세션으로 검색하므로 100% 가 정상이다.
+    # 떨어지면 품질 문제가 아니라 owner 필터가 새는 것이다.
+    leak = n - doc_hits
+    print(f"owner 누출     : {leak}건" + ("  (정상)" if leak == 0 else "  <-- 남의 문서 청크가 섞였다"))
 
-
-    print(f"평균 검색 시간 : {total_ms / n:.0f}ms\n")
+    # 문서마다 청크 수가 크게 다르다(가이드 122 vs 이력서 14). 합쳐 보면 가려진다.
+    print(f"\n{'문서':28} {'Recall':>10}  {'MRR':>6}  {'평균ms':>7}")
+    print("-" * 78)
+    for doc in sorted({item["doc"] for item, *_ in rows}):
+        sub = [r for r in rows if r[0]["doc"] == doc]
+        sn = len(sub)
+        sh = sum(1 for _, rank, *_ in sub if rank)
+        srr = sum(1 / rank for _, rank, *_ in sub if rank)
+        sms = sum(r[3] for r in sub)
+        print(f"{doc[:28]:28} {sh}/{sn} ({sh / sn * 100:5.1f}%)  {srr / sn:6.3f}  {sms / sn:7.0f}")
+    print()
 
 
 if __name__ == "__main__":
