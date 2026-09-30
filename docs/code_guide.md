@@ -43,7 +43,8 @@ Python AI 백엔드 (:8001)              H2 파일 DB
     └── Qdrant 임베디드  벡터 저장/검색 (로컬 파일)
 ```
 
-**핵심 원칙**: 프론트엔드는 Spring Boot하고만 통신한다. Python AI 서비스는 Spring Boot가 내부적으로만 호출한다.
+**핵심 원칙**: 프론트엔드는 데이터를 Spring Boot하고만 주고받는다. Python AI 서비스의 기능은 Spring Boot가 내부적으로만 호출한다.
+예외는 하나 — 잠든 FastAPI 를 깨우려고 브라우저가 `GET /health` 를 직접 부른다(`frontend/src/api/server.ts`, changelog v4.23·v4.34).
 
 ---
 
