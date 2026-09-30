@@ -337,7 +337,13 @@ Spring Boot  ─ Render (512MB)  ──→  Supabase Postgres (서울)   문서 
 FastAPI      ─ Render (512MB)  ──┬→ Qdrant Cloud (US East)     벡터 저장 · 검색
                                  ├→ OpenAI  text-embedding-3-large (3072차원)
                                  └→ Groq    openai/gpt-oss-120b   답변 생성
+
+예외 하나:  브라우저 ┄┄ GET /health ┄┄▶ FastAPI      잠든 서버 깨우기 전용 · 데이터는 오가지 않음
 ```
+
+데이터는 전부 Spring Boot 를 거칩니다. 다만 **브라우저가 FastAPI 를 직접 한 번 두드리는 예외**가 있습니다.
+Render 안에서 Spring 이 잠든 FastAPI 를 부르면 502 만 돌아오고 깨어나지 않았기 때문입니다(v4.23 실측, [스토리 7](#7-배포-후에야-드러난-것--안에서-부른-요청은-잠든-서버를-깨우지-못한다)).
+그래서 검색·업로드처럼 FastAPI 가 필요한 동작 직전에 브라우저가 `/health` 를 먼저 호출해 깨웁니다(`frontend/src/api/server.ts`).
 
 무료 티어라 **512MB 제한과 15분 후 잠드는 특성**이 설계에 그대로 영향을 줬습니다.
 업로드 한도(10MB × 동시 3개), 깨우는 순서, 임베딩 모델 선택이 모두 이 제약에서 나온 결정입니다.
@@ -361,7 +367,7 @@ Python AI 백엔드 (:8001)       H2 파일 DB
     └── Qdrant 임베디드    벡터 저장/검색 (backend-ai/data/qdrant)
 ```
 
-**설계 원칙**: 프론트엔드는 Spring Boot하고만 통신합니다. Python AI 서비스는 Spring Boot가 내부적으로만 호출합니다.
+**설계 원칙**: 프론트엔드는 데이터를 Spring Boot하고만 주고받습니다. Python AI 서비스의 기능은 Spring Boot가 내부적으로만 호출합니다. 유일한 예외는 서버를 깨우기 위한 `GET /health` 입니다(위 배포 구조 참고).
 
 업로드와 답변 생성은 모두 **SSE 스트리밍**입니다. 진행률과 토큰이 도착하는 대로 화면에 전달됩니다.
 
