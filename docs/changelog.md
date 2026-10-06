@@ -66,6 +66,14 @@ ES 를 서비스에 붙인다면 문서 삭제·만료 청소에서 ES 도 같�
 - `search_hybrid` 는 한쪽이 0건이면 조용히 넘어가지 않고 멈추게 했다.
 - 실험 중에는 reload_corpus 뒤 Spring 을 꺼서 만료 청소를 멈춘다.
 
+### 두 번째 함정: 실험 설정을 바꾸다 잔여 벡터를 다시 만들었다
+bge-m3 측정 뒤 OpenAI 로 되돌려 평가하니 16/18 이 아니라 15/18 이 나왔다. 검색 점수가 **같은 값 두 개씩 짝지어**
+나왔고, ES 사본을 세 보니 평가 문서가 doc_id 두 개씩(122+122, 14+14) 있었다.
+bge-m3 측정 때 reload_corpus 가 기존 문서를 지웠는데, 그때 FastAPI 는 `qdrant_bgem3` 폴더를 보고 있어서
+삭제 요청이 OpenAI 쪽 저장소에 가지 않았다. DB 에서는 지워지고 벡터만 남은 **잔여 벡터**다.
+v4.17 에서 만든 `/api/documents/leftovers` 가 2건을 찾았고 `/cleanup` 으로 지운 뒤 16/18(MRR 0.741)로 돌아왔다.
+**저장소를 바꿔 끼운 채로 삭제하면 원래 저장소에 잔여가 남는다** — 설정을 되돌린 뒤 leftovers 부터 확인할 것.
+
 ### 재현 순서
 1. Docker: `docker run -d --name es-study -p 9200:9200 -e discovery.type=single-node -e xpack.security.enabled=false -e "ES_JAVA_OPTS=-Xms1g -Xmx1g" docker.elastic.co/elasticsearch/elasticsearch:8.15.0`
    → `docker exec es-study bin/elasticsearch-plugin install analysis-nori` → `docker restart es-study`
