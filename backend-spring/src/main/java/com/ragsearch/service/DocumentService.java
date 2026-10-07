@@ -116,7 +116,7 @@ public class DocumentService {
                     "total_chunks", chunks.size()
             ));
 
-            // 3. Python AI 서비스로 임베딩 + ChromaDB 저장 (SSE 프록시)
+            // 3. Python AI 서비스로 임베딩 + Qdrant 저장 (SSE 프록시)
             String docId = UUID.randomUUID().toString();
             sendEvent(emitter, Map.of("stage", "embedding", "message", "임베딩 중... (처음 실행 시 30초 정도 소요될 수 있습니다)"));
             // heartbeat: nginx 버퍼링 방지 및 cold start 대기 중 연결 유지
