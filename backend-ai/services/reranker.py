@@ -15,6 +15,9 @@ from config import settings
 
 JINA_URL = "https://api.jina.ai/v1/rerank"
 
+# 연결 재사용 (vector_repository._http 와 같은 이유). 2026-10-08 측정(10회): 보통 439 → 306ms.
+_http = requests.Session()
+
 
 def enabled() -> bool:
     return settings.rerank_provider == "jina" and bool(settings.jina_api_key)
@@ -27,7 +30,7 @@ def rerank(query: str, chunks: List[Dict[str, Any]], top_k: int) -> Optional[Lis
 
     started = time.time()
     try:
-        resp = requests.post(
+        resp = _http.post(
             JINA_URL,
             headers={"Authorization": f"Bearer {settings.jina_api_key}"},
             json={

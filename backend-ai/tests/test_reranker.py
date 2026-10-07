@@ -1,6 +1,6 @@
 """리랭커: 성공하면 점수 순으로 자르고, 꺼져 있거나 실패하면 None (= 벡터 순서를 쓴다).
 
-실제 Jina 를 부르지 않는다. requests.post 를 가짜로 바꿔 응답과 실패를 흉내낸다.
+실제 Jina 를 부르지 않는다. HTTP 연결(reranker._http)의 post 를 가짜로 바꿔 응답과 실패를 흉내낸다.
 """
 import requests
 
@@ -40,7 +40,7 @@ def test_reorders_by_api_result_and_cuts_to_top_k(monkeypatch):
     body = {"results": [{"index": 3, "relevance_score": 0.9},
                         {"index": 0, "relevance_score": 0.7},
                         {"index": 4, "relevance_score": 0.2}]}
-    monkeypatch.setattr(requests, "post", lambda *a, **k: FakeResponse(200, body))
+    monkeypatch.setattr(reranker._http, "post", lambda *a, **k: FakeResponse(200, body))
 
     ranked = reranker.rerank("질문", CHUNKS, 2)
 
@@ -49,7 +49,7 @@ def test_reorders_by_api_result_and_cuts_to_top_k(monkeypatch):
 
 def test_rate_limited_falls_back(monkeypatch):
     turn_on(monkeypatch)
-    monkeypatch.setattr(requests, "post", lambda *a, **k: FakeResponse(429, {}))
+    monkeypatch.setattr(reranker._http, "post", lambda *a, **k: FakeResponse(429, {}))
 
     assert reranker.rerank("질문", CHUNKS, 4) is None
 
@@ -60,6 +60,6 @@ def test_timeout_falls_back(monkeypatch):
     def slow(*a, **k):
         raise requests.Timeout()
 
-    monkeypatch.setattr(requests, "post", slow)
+    monkeypatch.setattr(reranker._http, "post", slow)
 
     assert reranker.rerank("질문", CHUNKS, 4) is None
