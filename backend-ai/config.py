@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     qdrant_api_key: str = ""
 
     top_k: int = 4
+
+    # ── 리랭커 (선택) ─────────────────────────────────────────
+    # "" = 끔(벡터 순서 그대로). "jina" = 벡터 후보를 Jina API 로 다시 채점해 top_k 를 고른다.
+    # 실패·시간 초과면 벡터 순서로 진행한다 - 검색이 멈추지 않는다 (services/reranker.py).
+    rerank_provider: str = ""
+    jina_api_key: str = ""
+    rerank_model: str = "jina-reranker-v2-base-multilingual"
+    rerank_candidates: int = 20     # 평가(v4.36): 벡터 20개 안에 정답 44/45
+    rerank_timeout_s: float = 1.5   # 한국에서 잰 리랭크 약 0.65초. 넘으면 기다리지 않는다
     # 컬렉션 전체 청크 수가 이 값 이하면 검색을 건너뛰고 전부 컨텍스트로 넣는다.
     # (한두 개 문서만 올리는 데모에서 검색 누락을 없앤다)
     full_context_threshold: int = 12
