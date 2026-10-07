@@ -44,10 +44,17 @@ JINA_MODEL = "jina-reranker-v2-base-multilingual"
 COHERE_MODEL = "rerank-v3.5"
 
 
-def candidates(question: str, n: int, owner: str):
-    """벡터 n개 + BM25 n개를 합친다. 같은 청크는 (문서, 몇 번째 청크) 로 한 번만 남긴다."""
+def candidates(question: str, n: int, owner: str, source: str):
+    """벡터 n개 + BM25 n개를 합친다. 같은 청크는 (문서, 몇 번째 청크) 로 한 번만 남긴다.
+
+    source="vector" 는 BM25 없이 벡터 n개만 쓴다. 배포 서버(Render 512MB)에는 ES 를
+    못 올리므로, 실제로 붙일 수 있는 구성이 이쪽이다.
+    """
+    found = search(question, n, owner)
+    if source == "both":
+        found += search_bm25(question, n, owner)
     merged = {}
-    for chunk in search(question, n, owner) + search_bm25(question, n, owner):
+    for chunk in found:
         key = (chunk["metadata"]["doc_id"], chunk["metadata"]["chunk_index"])
         merged.setdefault(key, chunk)
     return list(merged.values())
@@ -104,11 +111,12 @@ def main():
     parser.add_argument("--dataset", default="dataset.json")
     parser.add_argument("--candidates", type=int, default=20)
     parser.add_argument("--top-k", type=int, default=4)
+    parser.add_argument("--source", choices=["both", "vector"], default="both")
     args = parser.parse_args()
 
     dataset = json.load(io.open(BASE / args.dataset, encoding="utf-8"))
     score = make_scorer(args.provider)
-    print(f"리랭커: {args.provider} / 후보: 각 {args.candidates}개 / 질문셋: {args.dataset}")
+    print(f"리랭커: {args.provider} / 후보: {args.source} 각 {args.candidates}개 / 질문셋: {args.dataset}")
 
     hits = 0
     rr_sum = 0.0
@@ -116,7 +124,7 @@ def main():
     print(f"\n   결과  순위  후보  리랭크ms  질문")
     print("-" * 78)
     for item in dataset:
-        pool = candidates(item["question"], args.candidates, owner_for(item["doc"]))
+        pool = candidates(item["question"], args.candidates, owner_for(item["doc"]), args.source)
 
         started = time.time()
         waited_before = getattr(score, "waited_ms", 0.0)
